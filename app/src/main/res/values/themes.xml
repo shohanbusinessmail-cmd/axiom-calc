@@ -4,16 +4,34 @@
       Base (light) window theme. Axiom Calc renders entirely in Compose, so this
       theme only has to make the first frame and the system bars correct. It uses
       the platform Material theme to avoid pulling in an extra UI dependency.
+
+      Three attributes are deliberately NOT here:
+
+        android:windowLightNavigationBar        added in API 27
+        android:enforceStatusBarContrast        added in API 29
+        android:enforceNavigationBarContrast    added in API 29
+
+      minSdk is 24, and Android lint correctly reports each of them as a NewApi
+      error when they appear in an unqualified values/ folder. They are set in
+      values-v27/ and values-v29/ instead, so a device only ever reads an
+      attribute its own platform defines. Nothing is suppressed with
+      tools:targetApi and no behaviour is given up on API 27+.
+
+      The enforce*Contrast attributes matter: their platform default is TRUE,
+      which would draw an opaque scrim over the transparent system bars this
+      app asks for. They are only settable from API 29, so on API 24-28 the
+      scrim is whatever the platform decides and the app does not claim
+      otherwise. See DELIVERY_REPORT.md section F.
     -->
-    <style name="Theme.AxiomCalc" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Base.Theme.AxiomCalc" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/surface_light</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:enforceStatusBarContrast">false</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:textColorPrimary">#FF11151C</item>
         <item name="android:textColorSecondary">#FF5A6472</item>
     </style>
+
+    <!-- The style the manifest applies. Overridden in values-v27 and values-v29. -->
+    <style name="Theme.AxiomCalc" parent="Base.Theme.AxiomCalc" />
 </resources>

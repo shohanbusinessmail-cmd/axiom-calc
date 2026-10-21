@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 27-28, light. Adds android:windowLightNavigationBar, which exists only
+      from API 27: dark icons on the light navigation bar. The enforce*Contrast
+      attributes are still not available here; they arrive in values-v29.
+    -->
+    <style name="Theme.AxiomCalc" parent="Base.Theme.AxiomCalc">
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

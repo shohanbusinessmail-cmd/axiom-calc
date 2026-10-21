@@ -3,6 +3,7 @@ package com.shohankhan.axiomcalc.math.matrices
 import com.shohankhan.axiomcalc.core.errors.CalcError
 import com.shohankhan.axiomcalc.core.errors.CalcException
 import com.shohankhan.axiomcalc.math.precision.Precision
+import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -241,7 +242,7 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
 
     private fun trim(v: Double, decimals: Int): String {
         if (v == 0.0) return "0"
-        val s = String.format("%.${decimals}f", v)
+        val s = String.format(Locale.ROOT, "%.${decimals}f", v)
         return s.trimEnd('0').trimEnd('.')
     }
 

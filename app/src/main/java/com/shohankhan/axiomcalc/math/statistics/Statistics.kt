@@ -104,7 +104,7 @@ object Statistics {
     }
 
     private fun sqrtDecimal(x: CalcNumber): CalcNumber =
-        CalcNumber.of(x.value.sqrt(Precision.MC))
+        CalcNumber.of(Precision.sqrt(x.value))
 
     /** A complete summary block, used by the Math Lab statistics panel. */
     fun summarize(values: List<CalcNumber>): Summary {

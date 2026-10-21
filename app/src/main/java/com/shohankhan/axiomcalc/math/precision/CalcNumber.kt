@@ -62,6 +62,88 @@ object Precision {
     /** Matrix dimension guard: rows*cols must stay <= this. */
     const val MAX_MATRIX_CELLS: Int = 4096
 
+    /**
+     * Working context for the square-root iteration: [MC] plus four guard
+     * digits, so the value returned after the final rounding is not decided by
+     * an oscillation in the last digit.
+     */
+    private val SQRT_MC: MathContext = MathContext(MC.precision + 4, ROUNDING)
+
+    /**
+     * Iteration cap for [sqrt]. Newton-Raphson converges quadratically, so a
+     * 38-digit result settles in well under twenty steps from the magnitude
+     * seed; the cap only exists so a bug cannot become an unbounded loop.
+     */
+    private const val SQRT_MAX_ITERATIONS: Int = 100
+
+    private val TWO: BigDecimal = BigDecimal.valueOf(2L)
+
+    /**
+     * Square root of a non-negative decimal, correctly rounded to [MC].
+     *
+     * This deliberately does NOT call `java.math.BigDecimal.sqrt`. That method
+     * was added in **API level 33**, and this application supports API 24, so
+     * calling it throws `NoSuchMethodError` on every Android 7.0 to 12L device.
+     * Android lint reports that as a `NewApi` error and it is a real crash, not
+     * a style complaint: `sqrt(81)` is reachable from the Standard calculator,
+     * from the statistics module and from thirteen geometry formulas.
+     *
+     * Newton-Raphson on [BigDecimal] is used instead:
+     *
+     *     x' = (x + n / x) / 2
+     *
+     * It exists on every platform, converges quadratically, and is iterated at
+     * [SQRT_MC] before being rounded once to [MC]. The seed is
+     * 10^floor(log10(n)/2), which keeps the step count independent of the
+     * magnitude of n - important because the exponent guard allows values with
+     * up to 100000 digits, where a naive seed would need tens of thousands of
+     * iterations.
+     *
+     * @throws CalcException [CalcError.Domain] when [value] is negative, which
+     * is the same typed error the rest of the engine reports; a negative
+     * argument never becomes `NaN` and never returns a plausible-looking zero.
+     */
+    fun sqrt(value: BigDecimal): BigDecimal {
+        if (value.signum() == 0) return BigDecimal.ZERO
+        if (value.signum() < 0) {
+            throw CalcException(
+                CalcError.Domain("sqrt", "sqrt of a negative number is not real"),
+            )
+        }
+        var x = sqrtSeed(value)
+        var previous: BigDecimal? = null
+        repeat(SQRT_MAX_ITERATIONS) {
+            val next = x.add(value.divide(x, SQRT_MC), SQRT_MC).divide(TWO, SQRT_MC)
+            if (next.compareTo(x) == 0) return next.round(MC)
+            val last = previous
+            if (last != null && next.compareTo(last) == 0) {
+                // A fixed point is unreachable at this precision and the
+                // sequence settled into a two-cycle straddling the root. Both
+                // values round identically to MC; return the smaller so that
+                // the reported root never squares to more than the argument.
+                return (if (next < x) next else x).round(MC)
+            }
+            previous = x
+            x = next
+        }
+        throw resourceLimit(
+            "sqrt iterations",
+            "the Newton sequence did not settle within $SQRT_MAX_ITERATIONS steps",
+        )
+    }
+
+    /**
+     * 10^floor(log10(value)/2): a positive seed within one order of magnitude
+     * of the true root, derived from the decimal exponent alone so it costs
+     * nothing even for a 100000-digit argument.
+     */
+    private fun sqrtSeed(value: BigDecimal): BigDecimal {
+        val stripped = value.stripTrailingZeros()
+        // For a stripped decimal, precision - scale - 1 is floor(log10(value)).
+        val adjustedExponent = stripped.precision() - stripped.scale() - 1
+        return BigDecimal(BigInteger.ONE, -Math.floorDiv(adjustedExponent, 2))
+    }
+
     internal fun overflow(detail: String): Nothing = throw CalcException(CalcError.Overflow(detail))
     internal fun resourceLimit(limit: String, detail: String = ""): Nothing =
         throw CalcException(CalcError.ResourceLimit(limit, detail))

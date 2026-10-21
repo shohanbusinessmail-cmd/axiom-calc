@@ -895,7 +895,7 @@ object FormulaCatalog {
 
 
     private fun sqrtDec(v: CalcNumber): CalcNumber =
-        CalcNumber.of(v.value.sqrt(com.shohankhan.axiomcalc.math.precision.Precision.MC))
+        CalcNumber.of(com.shohankhan.axiomcalc.math.precision.Precision.sqrt(v.value))
 
     private fun weekday(d: CivilDate): String {
         val names = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")

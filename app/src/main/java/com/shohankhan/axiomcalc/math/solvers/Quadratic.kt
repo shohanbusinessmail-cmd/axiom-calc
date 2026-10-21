@@ -4,6 +4,7 @@ import com.shohankhan.axiomcalc.core.errors.CalcError
 import com.shohankhan.axiomcalc.core.errors.CalcException
 import com.shohankhan.axiomcalc.math.complex.Complex
 import com.shohankhan.axiomcalc.math.precision.CalcNumber
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -40,7 +41,7 @@ data class QuadraticSolution(
     }
 
     private fun fmt(v: Double): String =
-        String.format("%.10f", v).trimEnd('0').trimEnd('.')
+        String.format(Locale.ROOT, "%.10f", v).trimEnd('0').trimEnd('.')
 }
 
 /**

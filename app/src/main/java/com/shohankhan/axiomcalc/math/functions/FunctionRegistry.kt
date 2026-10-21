@@ -137,7 +137,7 @@ object FunctionRegistry {
         // ---- roots and powers
         fn("sqrt", 1, 1, "sqrt(x)", "Square root", "x >= 0") { a, _ ->
             a[0].requireReal(a[0].signum >= 0, "sqrt", "sqrt of negative ${a[0]} is not real")
-            CalcNumber.of(a[0].value.sqrt(Precision.MC))
+            CalcNumber.of(Precision.sqrt(a[0].value))
         },
         fn("cbrt", 1, 1, "cbrt(x)", "Cube root (real, sign preserving)", "all real x") { a, _ ->
             CalcNumber.fromTranscendental(cbrt(a[0].toDouble()))

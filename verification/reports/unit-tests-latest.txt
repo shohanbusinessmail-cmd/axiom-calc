@@ -2,7 +2,7 @@
 ========================================================================
 Axiom Calc - resource validation
 ========================================================================
-XML files parsed .......... 38
+XML files parsed .......... 42
 Vector drawables .......... 28
 Vector paths validated .... 42
 Resource kinds indexed .... ['drawable', 'mipmap', 'values', 'xml']
@@ -14,9 +14,9 @@ RESULT: PASS - all resources well-formed, all vector path data valid,
 ========================================================================
 Axiom Calc - Kotlin import validation
 ========================================================================
-Kotlin files scanned ...... 76
+Kotlin files scanned ...... 77
 Imported names indexed .... 339
-Top-level declarations .... 1648
+Top-level declarations .... 1671
 Member names suppressed ... 158
 ------------------------------------------------------------------------
 No missing or ambiguous imports detected.
@@ -24,14 +24,23 @@ No missing or ambiguous imports detected.
 RESULT: PASS
 
 >> static check: CI workflow
-SKIP - PyYAML is not installed; install it to validate .github/workflows
+========================================================================
+Axiom Calc - GitHub Actions workflow validation
+========================================================================
+Workflows checked ......... 1
+run scripts bash -n'd ..... 18
+python heredocs compiled .. 4
+------------------------------------------------------------------------
+No problems found.
+------------------------------------------------------------------------
+RESULT: PASS
 
->> compiling 38 Kotlin sources (core=31 tests=5 shim=2)
+>> compiling 39 Kotlin sources (core=31 tests=6 shim=2)
 >> running tests
 ====================================================================================================
 AXIOM CALC - STANDALONE VERIFICATION RUN (JUnit4-compatible shim harness)
 classes dir : /home/user/axiom-calc/verification/.out/classes
-test classes: 6    executed: 183
+test classes: 7    executed: 192
 ====================================================================================================
 com.shohankhan.axiomcalc.domain.CalculatorBehaviorTest
     PASS   additivePercentSubtraction
@@ -164,6 +173,16 @@ com.shohankhan.axiomcalc.math.ExpressionEngineTest
     PASS   zeroDividedByZeroIsTyped
     PASS   zeroToNegativePowerIsDivisionByZero
     PASS   zeroToZeroIsOne
+com.shohankhan.axiomcalc.math.PrecisionSqrtTest
+    PASS   engineReportsDomainForSqrtOfNegative
+    PASS   engineSqrtUsesThePlatformIndependentRoot
+    PASS   irrationalRootsMatchReferenceDigits
+    PASS   negativeArgumentIsATypedDomainError
+    PASS   resultSquaredReproducesTheArgument
+    PASS   rootIsMonotonicAndNeverNegative
+    PASS   standardDeviationUsesThePlatformIndependentRoot
+    PASS   veryLargeAndVerySmallMagnitudesStillConverge
+    PASS   zeroAndPerfectSquaresAreExact
 com.shohankhan.axiomcalc.math.SolversTest
     PASS   amortizationReference
     PASS   amortizationZeroRateDegeneratesToDivision
@@ -222,6 +241,6 @@ com.shohankhan.axiomcalc.math.SolversTest
     PASS   weightedMean
     PASS   zeroDenominatorGuards
 ----------------------------------------------------------------------------------------------------
-TOTAL 183   PASSED 183   FAILED 0   ERRORS 0   SKIPPED 0
+TOTAL 192   PASSED 192   FAILED 0   ERRORS 0   SKIPPED 0
 ----------------------------------------------------------------------------------------------------
 RESULT: PASS

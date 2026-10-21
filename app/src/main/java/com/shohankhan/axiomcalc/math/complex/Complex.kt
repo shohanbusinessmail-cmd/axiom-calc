@@ -2,6 +2,7 @@ package com.shohankhan.axiomcalc.math.complex
 
 import com.shohankhan.axiomcalc.core.errors.CalcError
 import com.shohankhan.axiomcalc.core.errors.CalcException
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -68,7 +69,7 @@ data class Complex(val re: Double, val im: Double) {
     private fun signOf(v: Double): String = if (v < 0) "-" else "+"
 
     private fun trim(v: Double, decimals: Int): String {
-        val scaled = String.format("%.${decimals}f", v)
+        val scaled = String.format(Locale.ROOT, "%.${decimals}f", v)
         return if (scaled.contains('.')) scaled.trimEnd('0').trimEnd('.') else scaled
     }
 
@@ -91,8 +92,8 @@ data class Polar(val r: Double, val thetaRadians: Double) {
     fun toRectangular(): Complex = Complex.ofPolar(r, thetaRadians)
 
     fun toString(decimals: Int = 6): String {
-        val rr = String.format("%.${decimals}f", r).trimEnd('0').trimEnd('.')
-        val th = String.format("%.${decimals}f", thetaRadians).trimEnd('0').trimEnd('.')
+        val rr = String.format(Locale.ROOT, "%.${decimals}f", r).trimEnd('0').trimEnd('.')
+        val th = String.format(Locale.ROOT, "%.${decimals}f", thetaRadians).trimEnd('0').trimEnd('.')
         return "${rr} ∠ ${th} rad"
     }
 }

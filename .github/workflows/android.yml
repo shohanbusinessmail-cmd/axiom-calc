@@ -175,19 +175,42 @@ jobs:
           counts = Counter((i.get('severity'), i.get('id')) for i in issues)
           for (sev, iid), n in sorted(counts.items()):
               print(f'  {sev:<9} {iid} x{n}')
+          root_dir = ET.parse(path).getroot().get('root') or ''
+
+          def show(issue):
+              loc = issue.find('location')
+              where = 'unknown location'
+              if loc is not None:
+                  path = (loc.get('file') or '').replace(root_dir, '')
+                  where = f"{path}:{loc.get('line')}:{loc.get('column')}"
+              print(f"[{issue.get('severity')}/{issue.get('id')}] {where}")
+              print(f"    {issue.get('message')}")
+
           errors = [i for i in issues if i.get('severity') == 'Error']
           print(f'--- all {len(errors)} Error-severity issues ---')
           for i in errors:
-              loc = i.find('location')
-              where = (f"{loc.get('file')}:{loc.get('line')}:{loc.get('column')}"
-                       if loc is not None else 'unknown location')
-              print(f"[{i.get('id')}] {where}")
-              print(f"    {i.get('message')}")
-              expl = i.find('explanation')
-              if expl is not None and expl.text:
-                  print(f"    why: {' '.join(expl.text.split())[:400]}")
+              show(i)
           if not errors:
               print('none')
+
+          # Warnings are published in full as well, except the two "a newer
+          # version exists" notices. This project pins a toolchain that was
+          # verified to work together (see README.md); upgrading on a
+          # suggestion is not an improvement, and 51 near-identical notices
+          # would bury the warnings that do describe real defects.
+          SUMMARISED = {'GradleDependency', 'AndroidGradlePluginVersion'}
+          warnings = [i for i in issues
+                      if i.get('severity') == 'Warning' and i.get('id') not in SUMMARISED]
+          print(f'--- all {len(warnings)} other Warning-severity issues ---')
+          for i in warnings:
+              show(i)
+          if not warnings:
+              print('none')
+          pinned = [i for i in issues if i.get('id') in SUMMARISED]
+          if pinned:
+              print(f'--- {len(pinned)} version-suggestion notices, not acted on ---')
+              for i in pinned[:5]:
+                  show(i)
           PYLINT
             echo '```'
           } > "$EVIDENCE_DIR/05b-lint.md"
