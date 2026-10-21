@@ -100,22 +100,30 @@ jobs:
       - name: Unit tests (real JUnit 4)
         id: unit-tests
         continue-on-error: true
-        run: ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee "$EVIDENCE_DIR/unit-tests.log"
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee "$EVIDENCE_DIR/unit-tests.log"
 
       - name: Lint
         id: lint
         continue-on-error: true
-        run: ./gradlew lintDebug 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug 2>&1 | tee "$EVIDENCE_DIR/lint.log"
 
       - name: Assemble debug
         id: assemble-debug
         continue-on-error: true
-        run: ./gradlew assembleDebug 2>&1 | tee "$EVIDENCE_DIR/assemble-debug.log"
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug 2>&1 | tee "$EVIDENCE_DIR/assemble-debug.log"
 
       - name: Assemble release (unsigned)
         id: assemble-release
         continue-on-error: true
-        run: ./gradlew assembleRelease 2>&1 | tee "$EVIDENCE_DIR/assemble-release.log"
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease 2>&1 | tee "$EVIDENCE_DIR/assemble-release.log"
 
       - name: Inspect the debug APK
         id: inspect-apk

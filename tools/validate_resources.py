@@ -162,6 +162,16 @@ def collect_existing_resources():
 
 REF_RE = re.compile(r'"@(?:(?P<ns>android):)?(?P<kind>[\w-]+)/(?P<name>[\w.-]+)"')
 
+# Theme-attribute references: "?attr/name" or "?android:attr/name".
+#
+# A bare "?attr/x" resolves against the *current theme*, so it only works when
+# some applied theme actually defines that attribute. AppCompat and Material
+# Components define attributes such as colorControlNormal; the framework
+# android:Theme.Material does NOT (the framework spelling is
+# "?android:attr/colorControlNormal"). Getting this wrong is an aapt2 link
+# failure that only shows up in a real Android build, so it is checked here.
+THEME_ATTR_RE = re.compile(r'"\?(?:(?P<ns>android):)?attr/(?P<name>[\w.-]+)"')
+
 # Kinds whose resources are declared inside res/values/*.xml rather than as
 # files in a per-kind folder.
 VALUES_KINDS = {"string", "color", "style", "dimen", "attr", "bool",
@@ -232,6 +242,17 @@ def main() -> int:
 
         # Reference resolution (skip @android: framework references).
         text = open(path, encoding="utf-8").read()
+
+        # Theme attributes must be project-defined or framework-qualified.
+        for m in THEME_ATTR_RE.finditer(text):
+            name, ns = m.group("name"), m.group("ns")
+            if ns == "android":
+                continue
+            if name not in names.get("attr", set()):
+                failures.append(
+                    f"{rel}: unresolved theme attribute ?attr/{name} - not defined by "
+                    f"this project and not provided by the applied framework theme "
+                    f"(use ?android:attr/{name}, tint in code, or define the attr)")
         for m in REF_RE.finditer(text):
             ns, kind, name = m.group("ns"), m.group("kind"), m.group("name")
             if ns == "android":
