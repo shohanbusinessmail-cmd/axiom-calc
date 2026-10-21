@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -42,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shohankhan.axiomcalc.R
 import com.shohankhan.axiomcalc.core.design.AxiomDimens
 import com.shohankhan.axiomcalc.infra.di.axiomViewModel
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 
@@ -202,9 +204,11 @@ fun StandardKeypad(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            // Hardware keyboard support: the keypad takes key focus so a physical
-            // or on-screen keyboard can drive the calculator.
+            // Hardware keyboard support: the keypad is focusable and takes key
+            // focus so a physical or on-screen keyboard can drive the calculator.
             .focusRequester(focusRequester)
+            .focusable()
+            .semantics { contentDescription = "Calculator keypad" }
             .onPreviewKeyEvent { event -> viewModel.consumeKeyEvent(event) },
         verticalArrangement = Arrangement.spacedBy(AxiomDimens.KeyGap),
     ) {

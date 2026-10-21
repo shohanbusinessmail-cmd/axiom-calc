@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+// internal so the instrumented suite can write a deliberately corrupt value
+// through the SAME DataStore instance (two active stores on one file throw).
+internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "axiom_calc_settings",
 )
 

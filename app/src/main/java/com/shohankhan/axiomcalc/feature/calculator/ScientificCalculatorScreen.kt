@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -95,6 +96,8 @@ fun ScientificCalculatorScreen(
                     verticalArrangement = Arrangement.spacedBy(AxiomDimens.KeyGap),
                     modifier = Modifier
                         .focusRequester(focusRequester)
+                        .focusable()
+                        .semantics { contentDescription = "Calculator keypad" }
                         .onPreviewKeyEvent { viewModel.consumeKeyEvent(it) },
                 ) {
                     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
