@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ===================== Application identity ===================== -->
+    <string name="app_name">Axiom Calc</string>
+    <string name="app_tagline">Offline mathematics, done precisely.</string>
+
+    <!-- ===================== Primary destinations ===================== -->
+    <string name="nav_standard">Standard</string>
+    <string name="nav_scientific">Scientific</string>
+    <string name="nav_formulas">Formulas</string>
+    <string name="nav_quick_solve">Quick Solve</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_math_lab">Math Lab</string>
+
+    <!-- ===================== Secondary destinations ===================== -->
+    <string name="title_history">History</string>
+    <string name="title_saved">Saved calculations</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_about">About</string>
+    <string name="title_formula_detail">Formula</string>
+
+    <!-- ===================== Common actions ===================== -->
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_delete_all">Clear all</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_copy_result">Copy result</string>
+    <string name="action_copy_expression">Copy expression</string>
+    <string name="action_paste">Paste</string>
+    <string name="action_save">Save</string>
+    <string name="action_saved">Saved</string>
+    <string name="action_reuse">Reuse</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_calculate">Calculate</string>
+    <string name="action_search">Search</string>
+    <string name="action_clear_search">Clear search</string>
+    <string name="action_select_all">Select all</string>
+    <string name="action_clear_selection">Clear selection</string>
+    <string name="action_favorite_add">Add to favorites</string>
+    <string name="action_favorite_remove">Remove from favorites</string>
+    <string name="action_open_calculator">Open calculator</string>
+    <string name="action_show_steps">Show steps</string>
+    <string name="action_hide_steps">Hide steps</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_redo">Redo</string>
+    <string name="action_email_owner">Email the developer</string>
+
+    <!-- ===================== Calculator keypad ===================== -->
+    <string name="key_all_clear">AC</string>
+    <string name="key_clear_entry">CE</string>
+    <string name="key_backspace">Backspace</string>
+    <string name="key_equals">Equals</string>
+    <string name="key_decimal_point">Decimal point</string>
+    <string name="key_add">Plus</string>
+    <string name="key_subtract">Minus</string>
+    <string name="key_multiply">Times</string>
+    <string name="key_divide">Divide</string>
+    <string name="key_percent">Percent</string>
+    <string name="key_sign_toggle">Toggle sign</string>
+    <string name="key_open_paren">Open parenthesis</string>
+    <string name="key_close_paren">Close parenthesis</string>
+    <string name="key_digit">Digit %1$s</string>
+
+    <!-- ===================== Memory ===================== -->
+    <string name="memory_store">MS</string>
+    <string name="memory_recall">MR</string>
+    <string name="memory_add">M+</string>
+    <string name="memory_subtract">M\u2212</string>
+    <string name="memory_clear">MC</string>
+    <string name="memory_indicator">Memory holds %1$s</string>
+    <string name="memory_empty">Memory is empty</string>
+
+    <!-- ===================== Display ===================== -->
+    <string name="display_expression">Expression</string>
+    <string name="display_result">Result</string>
+    <string name="display_preview">Preview</string>
+    <string name="display_empty">Enter an expression</string>
+    <string name="display_answer">Previous answer</string>
+
+    <!-- ===================== Angle modes ===================== -->
+    <string name="angle_mode">Angle mode</string>
+    <string name="angle_degrees">Degrees</string>
+    <string name="angle_radians">Radians</string>
+    <string name="angle_mode_switch">Switch angle mode, currently %1$s</string>
+
+    <!-- ===================== Scientific panel ===================== -->
+    <string name="scientific_compact">Compact</string>
+    <string name="scientific_expanded">Expanded</string>
+    <string name="scientific_mode_switch">Switch scientific keypad, currently %1$s</string>
+    <string name="scientific_inverse">Inverse</string>
+    <string name="scientific_second_function">Second function</string>
+
+    <!-- ===================== History ===================== -->
+    <string name="history_empty_title">No calculations yet</string>
+    <string name="history_empty_body">Results from Standard, Scientific, Formulas, Quick Solve and Math Lab appear here.</string>
+    <string name="history_search_hint">Search expressions and results</string>
+    <string name="history_selected_count">%1$d selected</string>
+    <string name="history_delete_one_title">Delete this entry?</string>
+    <string name="history_delete_many_title">Delete %1$d entries?</string>
+    <string name="history_delete_all_title">Clear all history?</string>
+    <string name="history_delete_confirm_body">Automatic retention already removes entries older than your chosen period. This action is immediate and cannot be undone. Saved calculations are not affected.</string>
+    <string name="history_filter_all">All time</string>
+    <string name="history_filter_today">Today</string>
+    <string name="history_filter_week">Last 7 days</string>
+    <string name="history_filter_month">Last 30 days</string>
+    <string name="history_group_today">Today</string>
+    <string name="history_group_yesterday">Yesterday</string>
+    <string name="history_copied">Result copied to clipboard</string>
+    <string name="history_reused">Expression loaded into %1$s</string>
+
+    <!-- ===================== Saved calculations ===================== -->
+    <string name="saved_empty_title">Nothing saved yet</string>
+    <string name="saved_empty_body">Save a calculation from any screen to keep it here permanently. Saved items are never removed by automatic history retention.</string>
+    <string name="saved_name_hint">Name this calculation</string>
+    <string name="saved_delete_title">Delete saved calculation?</string>
+
+    <!-- ===================== Formulas ===================== -->
+    <string name="formulas_search_hint">Search formula calculators</string>
+    <string name="formulas_category_all">All</string>
+    <string name="formulas_empty">No formula matches your search.</string>
+    <string name="formulas_result_title">Result</string>
+    <string name="formulas_formula_used">Formula used</string>
+    <string name="formulas_substitution">Substitution</string>
+    <string name="formulas_saved">Calculation saved</string>
+
+    <!-- ===================== Quick Solve ===================== -->
+    <string name="quick_solve_search_hint">Search solvers</string>
+    <string name="quick_solve_steps_title">How this was solved</string>
+    <string name="quick_solve_empty">No solver matches your search.</string>
+
+    <!-- ===================== Formula Library ===================== -->
+    <string name="library_search_hint">Search the formula library</string>
+    <string name="library_favorites">Favorites</string>
+    <string name="library_recent">Recently viewed</string>
+    <string name="library_all">All formulas</string>
+    <string name="library_empty">No formula matches your search.</string>
+    <string name="library_favorites_empty">Tap the star on any formula to keep it here.</string>
+    <string name="library_recent_empty">Formulas you open will be listed here.</string>
+    <string name="library_expression">Expression</string>
+    <string name="library_variables">Variables</string>
+    <string name="library_conditions">Conditions</string>
+    <string name="library_units">Units</string>
+    <string name="library_result_count">%1$d formulas</string>
+
+    <!-- ===================== Math Lab ===================== -->
+    <string name="lab_tab_matrices">Matrices</string>
+    <string name="lab_tab_statistics">Statistics</string>
+    <string name="lab_tab_complex">Complex</string>
+    <string name="lab_tab_solvers">Solvers</string>
+    <string name="lab_tab_bases">Bases</string>
+    <string name="lab_tab_engineering">Engineering</string>
+
+    <!-- ===================== Settings ===================== -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System default</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_feedback">Feedback</string>
+    <string name="settings_haptics">Key haptics</string>
+    <string name="settings_haptics_summary">Subtle vibration on keypad presses.</string>
+    <string name="settings_animations">Reduce animation</string>
+    <string name="settings_animations_summary">Shortens transitions and disables decorative motion.</string>
+    <string name="settings_numbers">Numbers</string>
+    <string name="settings_angle_mode">Default angle mode</string>
+    <string name="settings_auto_precision">Automatic precision</string>
+    <string name="settings_auto_precision_summary">Trim insignificant trailing zeros instead of always showing a fixed count.</string>
+    <string name="settings_decimal_precision">Decimal places</string>
+    <string name="settings_grouping">Digit grouping</string>
+    <string name="settings_grouping_summary">Show thousands separators, for example 1,234,567.</string>
+    <string name="settings_number_format">Number format</string>
+    <string name="settings_format_decimal">Decimal</string>
+    <string name="settings_format_scientific">Scientific</string>
+    <string name="settings_format_engineering">Engineering</string>
+    <string name="settings_data">Data</string>
+    <string name="settings_retention">Automatic history deletion</string>
+    <string name="settings_retention_summary">Entries older than this period are removed automatically. Saved calculations are never removed.</string>
+    <string name="settings_retention_1">After 1 day</string>
+    <string name="settings_retention_7">After 7 days</string>
+    <string name="settings_retention_30">After 30 days</string>
+    <string name="settings_retention_90">After 90 days</string>
+    <string name="settings_retention_never">Never (keep everything)</string>
+    <string name="settings_storage">Storage</string>
+    <string name="settings_storage_summary">All data stays in this app sandbox on this device.</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_offline_note">Axiom Calc never connects to the internet. It does not request the INTERNET permission.</string>
+
+    <!-- ===================== About ===================== -->
+    <string name="about_developed_by">Developed by:</string>
+    <string name="about_owner_name">Shohan Khan</string>
+    <string name="about_email_label">Email:</string>
+    <string name="about_owner_email">helloiamshohan@gmail.com</string>
+    <string name="about_version">Version %1$s (build %2$d)</string>
+    <string name="about_offline_title">Offline by design</string>
+    <string name="about_offline_body">Every calculation, formula, history entry and setting is processed and stored on this device. The app declares no permissions, contains no advertising or analytics software, and works in airplane mode.</string>
+    <string name="about_no_mail_client">No email application is available on this device.</string>
+
+    <!-- ===================== Errors (user facing) ===================== -->
+    <string name="error_generic">That calculation could not be completed.</string>
+    <string name="error_incomplete">Expression is incomplete.</string>
+    <string name="error_syntax">Expression has a syntax error.</string>
+    <string name="error_divide_by_zero">Cannot divide by zero.</string>
+    <string name="error_domain">Value is outside the allowed domain.</string>
+    <string name="error_overflow">Result is too large to represent.</string>
+    <string name="error_underflow">Result is too small to represent.</string>
+    <string name="error_invalid_argument">Invalid argument.</string>
+    <string name="error_unsupported">Operation is not supported.</string>
+    <string name="error_no_convergence">Solver did not converge.</string>
+    <string name="error_resource_limit">Calculation is too large. Reduce the input size.</string>
+    <string name="error_unknown_function">Unknown function.</string>
+    <string name="error_unbalanced_parentheses">Parentheses are not balanced.</string>
+    <string name="error_empty_input">Enter a value first.</string>
+    <string name="error_singular_matrix">Matrix is singular and has no inverse.</string>
+    <string name="error_dimension_mismatch">Matrix dimensions do not match.</string>
+    <string name="error_empty_dataset">Add at least one number.</string>
+    <string name="error_denominator_zero">Denominator cannot be zero.</string>
+
+    <!-- ===================== Accessibility ===================== -->
+    <string name="a11y_tab_selected">%1$s tab selected</string>
+    <string name="a11y_expression_display">Expression display, %1$s</string>
+    <string name="a11y_result_display">Result, %1$s</string>
+    <string name="a11y_history_shortcut">Open history</string>
+    <string name="a11y_settings_shortcut">Open settings</string>
+    <string name="a11y_more_options">More options</string>
+    <string name="a11y_loading">Loading</string>
+    <string name="a11y_error_state">Error: %1$s</string>
+
+</resources>

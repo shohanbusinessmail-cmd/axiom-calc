@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ic_nav_quick_solve: hand-authored vector asset, 24dp viewport.
+  Drawn with explicit geometry so the icon is guaranteed to exist and to render
+  identically on every density. No emoji, no remote asset, no missing resource.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M13.6,2.2L5.1,13.6h5.1L8.9,21.8L18.9,9.9h-5.6L13.6,2.2z" />
+</vector>

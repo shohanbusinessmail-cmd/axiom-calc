@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Base (light) window theme. Axiom Calc renders entirely in Compose, so this
+      theme only has to make the first frame and the system bars correct. It uses
+      the platform Material theme to avoid pulling in an extra UI dependency.
+    -->
+    <style name="Theme.AxiomCalc" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/surface_light</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:textColorPrimary">#FF11151C</item>
+        <item name="android:textColorSecondary">#FF5A6472</item>
+    </style>
+</resources>

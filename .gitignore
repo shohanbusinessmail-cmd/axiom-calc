@@ -1,0 +1,38 @@
+# ---- Gradle / Android build output ----
+.gradle/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+
+# ---- Kotlin ----
+.kotlin/
+
+# ---- Signing material: NEVER commit ----
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+secrets.properties
+
+# ---- Logs / reports ----
+*.log
+*.hprof
+lint-report-*.xml
+lint-report-*.html
+
+# ---- Local verification toolchain (bootstrapped on demand) ----
+verification/.out/
+verification/build/

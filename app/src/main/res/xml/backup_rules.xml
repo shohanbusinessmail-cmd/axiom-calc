@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below (allowBackup / fullBackupContent).
+  Axiom Calc stores only local calculation data, so a full backup of the app
+  sandbox is appropriate. No credentials or secrets exist to exclude.
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+    <include domain="file" path="datastore/" />
+</full-backup-content>
