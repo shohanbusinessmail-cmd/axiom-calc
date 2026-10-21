@@ -24,7 +24,12 @@ sealed class BufToken {
 
     /** Binary operator, exponent, or a unary minus at entry-leading position. */
     data class Op(val symbol: String) : BufToken() {
-        override fun render(): String = symbol
+        /**
+         * Alphabetic operators (`mod`) are rendered with surrounding spaces so a
+         * sequence like `7mod3` can never be mis-lexed as one identifier.
+         */
+        override fun render(): String =
+            if (symbol.isNotEmpty() && symbol.all { it.isLetter() }) " $symbol " else symbol
     }
 
     data object LParen : BufToken() { override fun render(): String = "(" }

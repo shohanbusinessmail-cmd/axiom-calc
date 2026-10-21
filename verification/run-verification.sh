@@ -32,11 +32,19 @@ OUT="$ROOT/verification/.out/classes"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-# Only the Android-free subset is compiled here. `domain/repository` declares
-# coroutines Flow contracts and therefore belongs to the Gradle/Android build.
+# Only the Android-free subset is compiled here. Three packages are excluded
+# because they depend on artifacts this harness cannot resolve offline:
+#   domain/repository  -> kotlinx.coroutines Flow contracts
+#   core/ui            -> Compose + Android resources (R, @StringRes)
+#   core/design        -> Compose Material 3 theme objects
+# Everything else (math/, core/errors, core/formatting, domain/model,
+# domain/calculator, domain/formula, domain/solver, domain/library) is compiled
+# and tested here, and the excluded packages are covered by the instrumented
+# suite documented in TESTING.md.
 mapfile -t CORE_SOURCES < <(
   find "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/math" \
-       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/core" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/core/errors" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/core/formatting" \
        "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/model" \
        "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/calculator" \
        "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/formula" \

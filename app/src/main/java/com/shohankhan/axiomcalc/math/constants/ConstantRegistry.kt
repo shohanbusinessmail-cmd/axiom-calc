@@ -118,6 +118,14 @@ object ConstantRegistry {
     private val byId: Map<String, ConstantDefinition> =
         all.associateBy { it.id.lowercase() }
 
-    /** Case-insensitive lookup. Returns null when the name is not a constant. */
-    fun find(id: String): ConstantDefinition? = byId[id.lowercase()]
+    /** Typographic symbols accepted as aliases, e.g. `π` for `pi`. */
+    private val bySymbol: Map<String, ConstantDefinition> =
+        all.filter { it.symbol != it.id }.associateBy { it.symbol }
+
+    /**
+     * Case-insensitive lookup by identifier, falling back to the typographic
+     * symbol so the calculator keypad can insert `π`, `τ` and `φ` directly and
+     * the engine still evaluates them. Returns null when the name is unknown.
+     */
+    fun find(id: String): ConstantDefinition? = byId[id.lowercase()] ?: bySymbol[id]
 }

@@ -185,7 +185,7 @@
     <string name="settings_retention_90">After 90 days</string>
     <string name="settings_retention_never">Never (keep everything)</string>
     <string name="settings_storage">Storage</string>
-    <string name="settings_storage_summary">All data stays in this app sandbox on this device.</string>
+    <string name="settings_storage_summary_old">All data stays in this app sandbox on this device.</string>
     <string name="settings_privacy">Privacy</string>
     <string name="settings_offline_note">Axiom Calc never connects to the internet. It does not request the INTERNET permission.</string>
 
@@ -218,6 +218,7 @@
     <string name="error_dimension_mismatch">Matrix dimensions do not match.</string>
     <string name="error_empty_dataset">Add at least one number.</string>
     <string name="error_denominator_zero">Denominator cannot be zero.</string>
+    <string name="error_insufficient_sample">Not enough values for this statistic.</string>
 
     <!-- ===================== Accessibility ===================== -->
     <string name="a11y_tab_selected">%1$s tab selected</string>
@@ -229,4 +230,75 @@
     <string name="a11y_loading">Loading</string>
     <string name="a11y_error_state">Error: %1$s</string>
 
+
+
+    <!-- Calculator screen -->
+    <string name="memory_value_format">Memory: %1$s</string>
+    <string name="save_calculation_title">Save calculation</string>
+    <string name="save_calculation_name_label">Name</string>
+    <string name="save_calculation_note">Saved calculations are kept permanently and are never removed by history retention.</string>
+
+    <!-- Shared tool runner (forms, Quick Solve tools, lab modules) -->
+    <string name="formulas_inputs_title">Inputs</string>
+    <string name="formulas_awaiting_input">Fill in every field to see the result.</string>
+    <string name="formulas_empty_body">No formula matches that search. Try a different word, or pick a category.</string>
+    <string name="quick_solve_steps_hint">Steps are available for this tool. Show them to see the relationship, the substitution and the restrictions.</string>
+    <string name="quick_solve_groups_title">Groups</string>
+    <string name="tool_not_found_title">Tool not found</string>
+    <string name="tool_not_found_body">This calculator is no longer available. Go back and pick another tool.</string>
+    <string name="angle_mode_degrees">DEG</string>
+    <string name="angle_mode_radians">RAD</string>
+    <string name="scientific_collapse">Less</string>
+    <string name="scientific_expand">More</string>
+    <string name="lab_complex_title">Complex</string>
+
+    <!-- Library detail, Math Lab modules and settings extras -->
+    <string name="library_detail_missing_body">This formula is no longer in the library. Go back and search again.</string>
+    <string name="library_open_calculator">Calculator</string>
+    <string name="library_implementation_available">Computed by %1$s.</string>
+    <string name="library_reference_only">Reference only: this entry documents the formula and its conditions. No calculator is offered for it.</string>
+    <string name="library_empty_body">Nothing matched that search. Clear the filters or try another keyword.</string>
+    <string name="lab_run_hint">Run the module to see results. Every value shown is computed by the shared engine.</string>
+    <string name="lab_matrices_body">Add, subtract, multiply, scale, transpose, determinant, rank, inverse and solve A·x = b with residual verification.</string>
+    <string name="lab_statistics_body">Count, sum, mean, median, mode, range, population and sample variance and standard deviation, plus weighted mean.</string>
+    <string name="lab_complex_body">Rectangular and polar complex arithmetic with magnitude, argument, conjugate and form conversion.</string>
+    <string name="lab_solver_body">Bisection and Newton–Raphson root finding on any expression, with iteration count, residual and explicit non-convergence reporting.</string>
+    <string name="lab_bases_body">Convert and compute in base 2, 8, 10 and 16, rejecting digits that do not belong to the source base.</string>
+    <string name="lab_formatting_body">Engineering and scientific notation, significant figures, rounding modes and truncation on the same value.</string>
+    <string name="lab_matrices_inputs">Matrices</string>
+    <string name="lab_matrix_a">Matrix A (rows separated by ;)</string>
+    <string name="lab_matrix_b">Matrix B (rows separated by ;)</string>
+    <string name="lab_vector_b">Right-hand side b (for A·x = b)</string>
+    <string name="lab_matrix_syntax">Example: 1, 2; 3, 4 is a 2×2 matrix. Entries may be negative or decimal.</string>
+    <string name="lab_operation">Operation</string>
+    <string name="lab_statistics_inputs">Dataset</string>
+    <string name="lab_dataset">Values (comma separated)</string>
+    <string name="lab_weights_optional">Weights (optional, comma separated)</string>
+    <string name="lab_complex_inputs">Complex numbers</string>
+    <string name="lab_polar_input">Polar</string>
+    <string name="lab_complex_rect_hint">Rectangular input: real and imaginary parts.</string>
+    <string name="lab_complex_polar_hint">Polar input: magnitude r and angle θ in radians.</string>
+    <string name="lab_solver_inputs">Root finding</string>
+    <string name="lab_solver_expression">f(x), written with x</string>
+    <string name="lab_solver_variable_hint">Example: x^3 - x - 2. Functions such as sin(x), ln(x) and sqrt(x) are available.</string>
+    <string name="lab_lower_bound">Lower bound a</string>
+    <string name="lab_upper_bound">Upper bound b</string>
+    <string name="lab_start_value">Start value</string>
+    <string name="lab_tolerance">Tolerance</string>
+    <string name="lab_bases_inputs">Number bases</string>
+    <string name="lab_value">Value</string>
+    <string name="lab_from_base">Source base</string>
+    <string name="lab_second_operand">Second operand</string>
+    <string name="lab_arithmetic_base">Arithmetic base</string>
+    <string name="lab_significant_figures">Significant figures</string>
+    <string name="lab_decimal_places">Decimal places</string>
+    <string name="lab_rounding_mode">Rounding mode</string>
+    <string name="lab_formatting_inputs">Formatting</string>
+    <string name="saved_permanent_note">Saved calculations are kept permanently. History retention never removes them.</string>
+    <string name="history_retention_note">Retention: %1$s</string>
+    <string name="settings_refresh_count">Refresh</string>
+    <string name="settings_apply_retention">Apply now</string>
+    <string name="about_documentation_title">Documentation</string>
+    <string name="about_documentation_body">The repository contains README.md, ARCHITECTURE.md, MATHEMATICS_SPEC.md, TESTING.md, RELEASE.md, SECURITY_AND_PRIVACY.md, THIRD_PARTY_NOTICES.md and FEATURE_ACCEPTANCE.md.</string>
+    <string name="settings_storage_summary">%1$d entries in history under the current retention policy.</string>
 </resources>

@@ -97,6 +97,23 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
         }
     }
 
+    /**
+     * Sum of the diagonal entries. Requires a square matrix; a non-square matrix
+     * has no trace and is reported as a typed error rather than summed anyway.
+     */
+    fun trace(): Double {
+        if (!isSquare) {
+            throw CalcException(CalcError.DimensionMismatch("trace requires a square matrix ($rows×$cols)"))
+        }
+        var sum = 0.0
+        for (i in 0 until rows) sum += this[i, i]
+        return sum
+    }
+
+    /** Row-major view as nested lists, for handing a system to the solver layer. */
+    fun toRows(): List<List<Double>> =
+        (0 until rows).map { r -> (0 until cols).map { c -> this[r, c] } }
+
     fun determinant(): Double {
         requireSquare("determinant")
         val lu = luDecomposition()

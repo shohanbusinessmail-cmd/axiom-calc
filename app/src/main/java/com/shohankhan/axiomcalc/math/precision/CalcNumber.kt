@@ -123,6 +123,16 @@ class CalcNumber internal constructor(val value: BigDecimal) : Comparable<CalcNu
 
     fun toDouble(): Double = value.toDouble()
 
+    /**
+     * Canonical, round-trippable text form used **for persistence only**.
+     *
+     * This is not a display format: it may contain an exponent, and it is the
+     * exact string that [fromCanonical] restores to an equal value. Keeping it
+     * separate from [NumberFormatter] guarantees that a stored result can be
+     * reused without ever parsing a formatted display string.
+     */
+    fun toCanonicalString(): String = value.stripTrailingZeros().toString()
+
     /** Exact conversion when integral, else null. Guarded against overflow. */
     fun toBigIntegerOrNull(): BigInteger? =
         if (isIntegral) value.toBigInteger() else null
@@ -155,6 +165,17 @@ class CalcNumber internal constructor(val value: BigDecimal) : Comparable<CalcNu
             } catch (e: NumberFormatException) {
                 throw CalcException(CalcError.Syntax(-1, "malformed numeric literal '$literal'"))
             }
+        }
+
+        /**
+         * Restores a value written by [toCanonicalString]. Returns null for text
+         * that is not a valid canonical number, so callers can report a real
+         * failure instead of substituting zero.
+         */
+        fun fromCanonical(text: String): CalcNumber? = try {
+            parse(text)
+        } catch (e: CalcException) {
+            null
         }
 
         /** Wraps a double produced by a transcendental function, re-rounded to [Precision.MC]. */
