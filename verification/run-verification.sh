@@ -38,6 +38,17 @@ echo
 echo ">> static check: imports"
 python3 "$ROOT/tools/validate_imports.py"
 echo
+# Optional: the CI workflow itself cannot be dry-run locally, so it is checked
+# statically (YAML parse, bash -n on every run script, compile every embedded
+# python heredoc, pipefail on every piped step). Skipped, not failed, when
+# PyYAML is unavailable.
+echo ">> static check: CI workflow"
+if python3 -c "import yaml" 2>/dev/null; then
+  python3 "$ROOT/tools/validate_workflow.py"
+else
+  echo "SKIP - PyYAML is not installed; install it to validate .github/workflows"
+fi
+echo
 
 if [[ ! -x "$TOOLS/jdk17/bin/java" || ! -x "$TOOLS/kotlinc/bin/kotlinc" ]]; then
   bash "$ROOT/tools/bootstrap-verification-toolchain.sh"

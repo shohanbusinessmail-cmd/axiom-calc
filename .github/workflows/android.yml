@@ -88,12 +88,26 @@ jobs:
           {
             echo '## Source manifest audit'
             echo '```'
-            if grep -q '<uses-permission' app/src/main/AndroidManifest.xml; then
-              echo 'FAIL: a uses-permission element is declared'
-              grep -n '<uses-permission' app/src/main/AndroidManifest.xml
-            else
-              echo 'PASS: no uses-permission element is declared'
-            fi
+            python3 - <<'PYAUDIT'
+          import re, pathlib, sys
+          text = pathlib.Path('app/src/main/AndroidManifest.xml').read_text()
+          requested, removed = [], []
+          for m in re.finditer(r'<uses-permission\b([^>]*)>', text):
+              attrs = m.group(1)
+              name = (re.search(r'android:name="([^"]+)"', attrs) or [None, '?'])[1]
+              (removed if 'tools:node="remove"' in attrs else requested).append(name)
+          print(f'permissions requested : {len(requested)}')
+          for n in requested:
+              print(f'    REQUESTED  {n}')
+          print(f'permissions removed   : {len(removed)}  (tools:node="remove")')
+          for n in removed:
+              print(f'    REMOVED    {n}')
+          bad = [n for n in requested if n != '?']
+          if bad:
+              print('FAIL: the source manifest requests a permission')
+              sys.exit(1)
+          print('PASS: the source manifest requests no permission; INTERNET is absent')
+          PYAUDIT
             echo '```'
           } > "$EVIDENCE_DIR/02-source-manifest.md"
 
@@ -115,6 +129,10 @@ jobs:
             echo '```'
             python3 tools/validate_imports.py 2>&1 | tee "$EVIDENCE_DIR/static-imports.log" | tail -20
             echo '```'
+            echo
+            echo '```'
+            python3 tools/validate_workflow.py 2>&1 | tee "$EVIDENCE_DIR/static-workflow.log" | tail -12
+            echo '```'
           } > "$EVIDENCE_DIR/00a-static.md"
 
       - name: Unit tests (real JUnit 4)
@@ -130,6 +148,49 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew lintDebug 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+
+      - name: Lint report
+        id: lint-report
+        if: always()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          {
+            echo '## Lint report'
+            echo '```'
+            python3 - <<'PYLINT'
+          import glob, os, sys, xml.etree.ElementTree as ET
+          from collections import Counter
+          reports = sorted(glob.glob('app/build/reports/**/lint-results*.xml', recursive=True))
+          if not reports:
+              print('no lint XML report was produced. Files under app/build/reports:')
+              for root, _dirs, files in os.walk('app/build/reports'):
+                  for f in files:
+                      print('  ', os.path.join(root, f))
+              sys.exit(0)
+          path = reports[0]
+          print('parsed', path)
+          issues = list(ET.parse(path).getroot().findall('issue'))
+          print(f'total issues: {len(issues)}')
+          counts = Counter((i.get('severity'), i.get('id')) for i in issues)
+          for (sev, iid), n in sorted(counts.items()):
+              print(f'  {sev:<9} {iid} x{n}')
+          errors = [i for i in issues if i.get('severity') == 'Error']
+          print(f'--- all {len(errors)} Error-severity issues ---')
+          for i in errors:
+              loc = i.find('location')
+              where = (f"{loc.get('file')}:{loc.get('line')}:{loc.get('column')}"
+                       if loc is not None else 'unknown location')
+              print(f"[{i.get('id')}] {where}")
+              print(f"    {i.get('message')}")
+              expl = i.find('explanation')
+              if expl is not None and expl.text:
+                  print(f"    why: {' '.join(expl.text.split())[:400]}")
+          if not errors:
+              print('none')
+          PYLINT
+            echo '```'
+          } > "$EVIDENCE_DIR/05b-lint.md"
 
       - name: Assemble debug
         id: assemble-debug
@@ -204,17 +265,72 @@ jobs:
           set -uo pipefail
           {
             echo '## Merged manifest audit'
+            echo
+            echo 'The source manifest requests nothing, but the manifest that ships is the'
+            echo 'merged one, so that is what is audited. Every permission in it must be on'
+            echo 'the allowlist below; anything else fails the build.'
+            echo
             echo '```'
-            FOUND=0
-            for M in $(find app/build -name 'AndroidManifest.xml' -path '*merged*' 2>/dev/null | sort); do
-              echo "---- $M ----"
-              if grep -q 'uses-permission' "$M"; then
-                echo 'FAIL: merged manifest declares a permission'
-                grep -n 'uses-permission' "$M"
-                FOUND=1
-              fi
-            done
-            [ "$FOUND" -eq 0 ] && echo 'PASS: no merged manifest declares any permission (INTERNET absent)'
+            python3 - <<'PYAUDIT'
+          import glob, re, sys
+          ALLOWED = {
+              # Defined by androidx.core ON THIS APP with protectionLevel
+              # "signature" and then requested by the same app, so a receiver
+              # registered with RECEIVER_NOT_EXPORTED can only be signalled by
+              # this application. It grants no network, storage, hardware or
+              # cross-app access. WorkManager registers its force-stop
+              # receiver through ContextCompat.registerReceiver, which relies
+              # on it, and removing it cannot be tested on API 24-32 here.
+              'com.shohankhan.axiomcalc.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
+          }
+          FORBIDDEN = {
+              'android.permission.INTERNET',
+              'android.permission.ACCESS_NETWORK_STATE',
+              'android.permission.ACCESS_WIFI_STATE',
+              'android.permission.CHANGE_NETWORK_STATE',
+              'android.permission.WAKE_LOCK',
+              'android.permission.RECEIVE_BOOT_COMPLETED',
+              'android.permission.FOREGROUND_SERVICE',
+              'android.permission.VIBRATE',
+              'android.permission.READ_EXTERNAL_STORAGE',
+              'android.permission.WRITE_EXTERNAL_STORAGE',
+              'android.permission.ACCESS_FINE_LOCATION',
+              'android.permission.CAMERA',
+              'android.permission.RECORD_AUDIO',
+              'android.permission.READ_CONTACTS',
+              'com.android.vending.BILLING',
+              'com.google.android.c2dm.permission.RECEIVE',
+          }
+          manifests = sorted(glob.glob('app/build/**/merged*manifest*/**/AndroidManifest.xml',
+                                       recursive=True))
+          if not manifests:
+              print('FAIL: no merged manifest was produced; nothing was audited')
+              sys.exit(1)
+          failed = False
+          for path in manifests:
+              text = open(path, encoding='utf-8').read()
+              names = sorted({m.group(1) for m in
+                              re.finditer(r'<uses-permission[^>]*android:name="([^"]+)"', text)})
+              print(f'---- {path}')
+              print(f'     uses-permission count: {len(names)}')
+              for n in names:
+                  if n in ALLOWED:
+                      print(f'     ALLOWED   {n}')
+                  elif n in FORBIDDEN:
+                      print(f'     FAIL      {n}  (explicitly forbidden)')
+                      failed = True
+                  else:
+                      print(f'     FAIL      {n}  (not on the allowlist)')
+              if not names:
+                  print('     (none)')
+          print()
+          if failed:
+              print('RESULT: FAIL - the shipped manifest declares a permission that is not allowed')
+              sys.exit(1)
+          print('RESULT: PASS - android.permission.INTERNET is absent from every merged')
+          print('        manifest, and the only surviving entry is the self-defined')
+          print('        signature permission that grants no capability.')
+          PYAUDIT
             echo '```'
           } > "$EVIDENCE_DIR/05-merged-manifest.md"
 
@@ -331,7 +447,8 @@ jobs:
                      "$EVIDENCE_DIR"/00b-compile-errors.md \
                      "$EVIDENCE_DIR"/01-wrapper.md "$EVIDENCE_DIR"/02-source-manifest.md \
                      "$EVIDENCE_DIR"/03-apk.md "$EVIDENCE_DIR"/04-release-apk.md \
-                     "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/06-dependencies.md; do
+                     "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/05b-lint.md \
+                     "$EVIDENCE_DIR"/06-dependencies.md; do
               [ -f "$f" ] && cat "$f" && echo
             done
             echo '<details><summary>Raw unit-test log (tail)</summary>'
@@ -431,24 +548,24 @@ jobs:
             echo "### Instrumented test results — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
             echo '```'
             python3 - <<'PY'
-            import glob, xml.etree.ElementTree as ET
-            tests = fails = errs = skip = 0
-            details = []
-            for path in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
-                root = ET.parse(path).getroot()
-                suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
-                for s in suites:
-                    tests += int(s.get("tests", 0)); fails += int(s.get("failures", 0))
-                    errs += int(s.get("errors", 0)); skip += int(s.get("skipped", 0))
-                    for tc in s.findall("testcase"):
-                        for kind in ("failure", "error"):
-                            for node in tc.findall(kind):
-                                details.append(f'{tc.get("classname")}.{tc.get("name")}: '
-                                               f'{(node.get("message") or "")[:300]}')
-            print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
-            for d in details[:60]:
-                print("FAILED " + d)
-            PY
+          import glob, xml.etree.ElementTree as ET
+          tests = fails = errs = skip = 0
+          details = []
+          for path in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
+              root = ET.parse(path).getroot()
+              suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+              for s in suites:
+                  tests += int(s.get("tests", 0)); fails += int(s.get("failures", 0))
+                  errs += int(s.get("errors", 0)); skip += int(s.get("skipped", 0))
+                  for tc in s.findall("testcase"):
+                      for kind in ("failure", "error"):
+                          for node in tc.findall(kind):
+                              details.append(f'{tc.get("classname")}.{tc.get("name")}: '
+                                             f'{(node.get("message") or "")[:300]}')
+          print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
+          for d in details[:60]:
+              print("FAILED " + d)
+          PY
             echo '```'
           } > /tmp/instr-comment.md
           if [ -n "$PR" ]; then

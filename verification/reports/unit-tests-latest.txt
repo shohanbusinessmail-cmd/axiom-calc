@@ -23,6 +23,9 @@ No missing or ambiguous imports detected.
 ------------------------------------------------------------------------
 RESULT: PASS
 
+>> static check: CI workflow
+SKIP - PyYAML is not installed; install it to validate .github/workflows
+
 >> compiling 38 Kotlin sources (core=31 tests=5 shim=2)
 >> running tests
 ====================================================================================================
