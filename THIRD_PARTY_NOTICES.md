@@ -71,6 +71,19 @@ shipped in the APK, none is a project dependency, and none appears in
 idempotently and is used only by `verification/run-verification.sh`. A normal
 build on a normal machine uses neither.
 
+### CI actions (GitHub-hosted, not shipped)
+
+`.github/workflows/android.yml` uses these published actions. They run on
+GitHub's infrastructure and are never part of the APK.
+
+| Action | Licence | Purpose |
+|--------|---------|---------|
+| `actions/checkout@v4` | MIT | Fetch the repository |
+| `actions/setup-java@v4` | MIT | Install Temurin JDK 17 |
+| `gradle/actions/setup-gradle@v4` | Apache 2.0 | Gradle caching and wrapper validation |
+| `actions/upload-artifact@v4` | MIT | Publish the APK, test and lint reports |
+| `reactivecircus/android-emulator-runner@v2` | MIT | Boot an emulator for instrumented tests |
+
 ---
 
 ## 3. Test-only dependencies (not shipped)

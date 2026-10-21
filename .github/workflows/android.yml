@@ -1,0 +1,217 @@
+# ============================================================================
+#  Axiom Calc - Android CI
+# ----------------------------------------------------------------------------
+#  This workflow exists to close the verification gaps that the authoring
+#  sandbox could not: it runs on GitHub-hosted runners, which have JDK 17, the
+#  Android SDK and network access to Google's and Maven's repositories.
+#
+#  It produces real, inspectable evidence for items reported as BLOCKED or
+#  NOT TESTED in DELIVERY_REPORT.md / FEATURE_ACCEPTANCE.md:
+#    * ./gradlew test            (the 183 unit tests under real JUnit 4)
+#    * ./gradlew lint
+#    * ./gradlew assembleDebug   and the resulting APK, inspected with aapt2
+#                                and apksigner, then uploaded as an artifact
+#    * merged-release-manifest permission audit (must contain zero permissions)
+#    * release runtime classpath audit (must contain no networking/analytics)
+#    * ./gradlew connectedDebugAndroidTest on an emulator (75 tests)
+#
+#  Nothing here signs a release with a production identity: no keystore or
+#  credential is referenced, and the release variant stays unsigned unless the
+#  owner supplies keystore.properties locally (see RELEASE.md section 5).
+# ============================================================================
+
+name: Android CI
+
+on:
+  push:
+    branches: ['arena/837f6b83-axiom-calc', main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    name: Build, unit tests, lint, APK inspection
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Record wrapper integrity
+        run: |
+          set -euo pipefail
+          ls -l gradle/wrapper/gradle-wrapper.jar
+          sha256sum gradle/wrapper/gradle-wrapper.jar
+          cat gradle/wrapper/gradle-wrapper.properties
+          ./gradlew --version
+
+      - name: Source manifest permission audit
+        run: |
+          set -euo pipefail
+          echo "== uses-permission elements in the source manifest =="
+          if grep -q '<uses-permission' app/src/main/AndroidManifest.xml; then
+            echo "FAIL: a uses-permission element is declared"
+            grep -n '<uses-permission' app/src/main/AndroidManifest.xml
+            exit 1
+          fi
+          echo "PASS: no uses-permission element is declared"
+
+      - name: Unit tests (real JUnit 4)
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Lint
+        run: ./gradlew lintDebug
+
+      - name: Assemble debug
+        run: ./gradlew assembleDebug
+
+      - name: Assemble release (unsigned)
+        run: ./gradlew assembleRelease
+
+      - name: Inspect the debug APK
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "== build tools: $BT =="
+
+          echo "== file exists and is non-zero =="
+          ls -l "$APK"
+          test -s "$APK"
+          stat -c '%s bytes' "$APK"
+
+          echo "== valid zip archive =="
+          unzip -t "$APK" > /dev/null && echo "PASS: archive integrity ok"
+
+          echo "== badging: package, version, SDK levels, permissions =="
+          "$BT/aapt2" dump badging "$APK"
+
+          echo "== permissions requested by the built APK (must be empty) =="
+          "$BT/aapt2" dump permissions "$APK" || true
+
+          echo "== signing status =="
+          "$BT/apksigner" verify --print-certs --verbose "$APK"
+
+          echo "== contents =="
+          unzip -l "$APK" | head -40
+
+      - name: Inspect the release APK
+        run: |
+          set -euo pipefail
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "== release artifact: $APK =="
+          ls -l "$APK"
+          "$BT/aapt2" dump badging "$APK"
+          echo "== release signing status (unsigned is expected: no owner key) =="
+          "$BT/apksigner" verify --print-certs --verbose "$APK" || \
+            echo "NOT SIGNED - expected, the owner must sign per RELEASE.md section 5"
+
+      - name: Merged manifest permission audit
+        run: |
+          set -euo pipefail
+          echo "== merged manifest files =="
+          find app/build -name 'AndroidManifest.xml' -path '*merged*' | sort
+          for M in $(find app/build -name 'AndroidManifest.xml' -path '*merged*' | sort); do
+            echo "---- $M ----"
+            if grep -q 'uses-permission' "$M"; then
+              echo "FAIL: merged manifest declares a permission"
+              grep -n 'uses-permission' "$M"
+              exit 1
+            fi
+          done
+          echo "PASS: no merged manifest declares any permission (INTERNET absent)"
+
+      - name: Release dependency audit
+        run: |
+          set -euo pipefail
+          ./gradlew app:dependencies --configuration releaseRuntimeClasspath \
+            > /tmp/release-classpath.txt
+          echo "== release runtime classpath =="
+          cat /tmp/release-classpath.txt
+          echo "== forbidden coordinate scan =="
+          BANNED='okhttp|retrofit|ktor|volley|firebase|play-services-ads|play-services-analytics|crashlytics|sentry|bugsnag|facebook|amplitude|mixpanel|segment|appsflyer|adjust|newrelic|onesignal|airship'
+          if grep -Eiq "$BANNED" /tmp/release-classpath.txt; then
+            echo "FAIL: a networking/analytics/advertising coordinate is present"
+            grep -Ein "$BANNED" /tmp/release-classpath.txt
+            exit 1
+          fi
+          echo "PASS: no networking, analytics, advertising or crash-reporting dependency"
+
+      - name: Upload APK and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axiom-calc-build-outputs
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/reports/tests/**
+            app/build/reports/lint-results-debug.*
+            app/schemas/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  instrumented:
+    name: Instrumented tests on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: build-and-verify
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Enable KVM for hardware acceleration
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Run instrumented tests (75)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          heap-size: 1024M
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axiom-calc-instrumented-reports
+          path: app/build/reports/androidTests/**
+          if-no-files-found: warn
+          retention-days: 14
