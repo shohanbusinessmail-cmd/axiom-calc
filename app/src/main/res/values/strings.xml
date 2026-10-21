@@ -131,6 +131,7 @@
     <string name="quick_solve_search_hint">Search solvers</string>
     <string name="quick_solve_steps_title">How this was solved</string>
     <string name="quick_solve_empty">No solver matches your search.</string>
+    <string name="quick_solve_empty_body">Nothing matched that search. Clear the query or try another keyword, for example "quadratic".</string>
 
     <!-- ===================== Formula Library ===================== -->
     <string name="library_search_hint">Search the formula library</string>

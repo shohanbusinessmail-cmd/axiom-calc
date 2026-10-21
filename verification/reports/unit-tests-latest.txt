@@ -1,3 +1,28 @@
+>> static check: resources
+========================================================================
+Axiom Calc - resource validation
+========================================================================
+XML files parsed .......... 38
+Vector drawables .......... 28
+Vector paths validated .... 42
+Resource kinds indexed .... ['drawable', 'mipmap', 'values', 'xml']
+------------------------------------------------------------------------
+RESULT: PASS - all resources well-formed, all vector path data valid,
+        all intra-project resource references resolve.
+
+>> static check: imports
+========================================================================
+Axiom Calc - Kotlin import validation
+========================================================================
+Kotlin files scanned ...... 76
+Imported names indexed .... 339
+Top-level declarations .... 1648
+Member names suppressed ... 158
+------------------------------------------------------------------------
+No missing or ambiguous imports detected.
+------------------------------------------------------------------------
+RESULT: PASS
+
 >> compiling 38 Kotlin sources (core=31 tests=5 shim=2)
 >> running tests
 ====================================================================================================

@@ -97,6 +97,26 @@ jobs:
             echo '```'
           } > "$EVIDENCE_DIR/02-source-manifest.md"
 
+      - name: Static checks (resources and imports)
+        id: static-checks
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          {
+            echo '## Static checks'
+            echo
+            echo 'Both run offline with no Android SDK. They exist because a real'
+            echo 'build exposed defects that nothing else in this sandbox can see.'
+            echo
+            echo '```'
+            python3 tools/validate_resources.py 2>&1 | tee "$EVIDENCE_DIR/static-resources.log" | tail -12
+            echo '```'
+            echo
+            echo '```'
+            python3 tools/validate_imports.py 2>&1 | tee "$EVIDENCE_DIR/static-imports.log" | tail -20
+            echo '```'
+          } > "$EVIDENCE_DIR/00a-static.md"
+
       - name: Unit tests (real JUnit 4)
         id: unit-tests
         continue-on-error: true
@@ -305,9 +325,10 @@ jobs:
             echo "### Android CI evidence — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
             echo
             echo "Generated on a GitHub-hosted runner with JDK 17 and the Android SDK."
-            echo "Step outcomes: unit tests=${{ steps.unit-tests.outcome }}, lint=${{ steps.lint.outcome }}, assembleDebug=${{ steps.assemble-debug.outcome }}, assembleRelease=${{ steps.assemble-release.outcome }}, APK=${{ steps.inspect-apk.outcome }}, release APK=${{ steps.inspect-release.outcome }}, merged manifest=${{ steps.merged-manifest.outcome }}, dependency audit=${{ steps.dep-audit.outcome }}."
+            echo "Step outcomes: static checks=${{ steps.static-checks.outcome }}, unit tests=${{ steps.unit-tests.outcome }}, lint=${{ steps.lint.outcome }}, assembleDebug=${{ steps.assemble-debug.outcome }}, assembleRelease=${{ steps.assemble-release.outcome }}, APK=${{ steps.inspect-apk.outcome }}, release APK=${{ steps.inspect-release.outcome }}, merged manifest=${{ steps.merged-manifest.outcome }}, dependency audit=${{ steps.dep-audit.outcome }}."
             echo
-            for f in "$EVIDENCE_DIR"/00-summary.md "$EVIDENCE_DIR"/00b-compile-errors.md \
+            for f in "$EVIDENCE_DIR"/00-summary.md "$EVIDENCE_DIR"/00a-static.md \
+                     "$EVIDENCE_DIR"/00b-compile-errors.md \
                      "$EVIDENCE_DIR"/01-wrapper.md "$EVIDENCE_DIR"/02-source-manifest.md \
                      "$EVIDENCE_DIR"/03-apk.md "$EVIDENCE_DIR"/04-release-apk.md \
                      "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/06-dependencies.md; do
@@ -328,7 +349,8 @@ jobs:
         run: |
           set -uo pipefail
           FAILED=""
-          for pair in "unit-tests:${{ steps.unit-tests.outcome }}" \
+          for pair in "static-checks:${{ steps.static-checks.outcome }}" \
+                      "unit-tests:${{ steps.unit-tests.outcome }}" \
                       "lint:${{ steps.lint.outcome }}" \
                       "assemble-debug:${{ steps.assemble-debug.outcome }}" \
                       "assemble-release:${{ steps.assemble-release.outcome }}" \

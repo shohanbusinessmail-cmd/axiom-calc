@@ -34,6 +34,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import com.shohankhan.axiomcalc.R
 import com.shohankhan.axiomcalc.core.design.AxiomTheme
 import com.shohankhan.axiomcalc.domain.model.AppSettings
@@ -152,6 +156,9 @@ fun AxiomApp(
                         primaryDestinations.forEach { destination ->
                             val selected = backStackEntry?.destination?.hierarchy
                                 ?.any { it.route == destination.route } == true
+                            // labelFor() reads a string resource, so it must run
+                            // in composition, not inside the semantics{} lambda.
+                            val label = labelFor(destination.route)
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = { navController.navigateToPrimary(destination.route) },
@@ -161,10 +168,10 @@ fun AxiomApp(
                                         contentDescription = null,
                                     )
                                 },
-                                label = { Text(labelFor(destination.route)) },
+                                label = { Text(label) },
                                 alwaysShowLabel = false,
                                 modifier = Modifier.semantics {
-                                    contentDescription = "Tab ${labelFor(destination.route)}" +
+                                    contentDescription = "Tab $label" +
                                         if (selected) ", selected" else ""
                                 },
                             )
@@ -342,5 +349,13 @@ private fun rememberSettings(): AppSettings {
 class SettingsObserver(
     settingsRepository: com.shohankhan.axiomcalc.domain.repository.SettingsRepository,
 ) : androidx.lifecycle.ViewModel() {
-    val settings = settingsRepository.settings
+    // A StateFlow rather than the cold repository Flow: `Flow<T>` has no
+    // no-argument collectAsStateWithLifecycle overload, and an eagerly shared
+    // StateFlow also avoids a one-frame flash of default settings at the root,
+    // which would briefly render the wrong theme.
+    val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AppSettings(),
+    )
 }

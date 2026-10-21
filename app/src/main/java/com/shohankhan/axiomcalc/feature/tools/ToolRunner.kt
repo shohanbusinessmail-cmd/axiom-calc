@@ -49,7 +49,7 @@ sealed interface ToolSpec {
         override val title: String get() = tool.title
         override val inputs: List<FormInput> get() = tool.inputs
         override val summary: String get() = tool.summary
-        override val formulaText: String get() = null
+        override val formulaText: String? get() = null
         override val explanation: String get() = tool.summary
         override fun compute(values: Map<String, String>): FormResult = tool.solve(values)
     }

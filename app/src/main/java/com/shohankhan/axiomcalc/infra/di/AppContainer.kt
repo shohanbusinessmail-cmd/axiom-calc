@@ -3,6 +3,7 @@ package com.shohankhan.axiomcalc.infra.di
 import android.content.Context
 import androidx.room.Room
 import androidx.work.WorkManager
+import com.shohankhan.axiomcalc.AxiomCalcApplication
 import com.shohankhan.axiomcalc.data.local.AxiomDatabase
 import com.shohankhan.axiomcalc.data.preferences.DataStoreSettingsRepository
 import com.shohankhan.axiomcalc.data.repository.RoomFavoritesRepository

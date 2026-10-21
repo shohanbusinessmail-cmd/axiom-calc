@@ -152,7 +152,7 @@ class MatrixLabViewModel : ViewModel() {
                     val x = solution.solution
                     if (x != null) {
                         lines += LabLine("x", x.joinToString(",  ") { fmt(it) })
-                        val residual = a.timesVector(x).mapIndexed { i, v -> v - rhs[i] }
+                        val residual = a.timesVector(x.toDoubleArray()).mapIndexed { i, v -> v - rhs[i] }
                         lines += LabLine(
                             "max |residual|",
                             fmt(residual.maxOf { kotlin.math.abs(it) }),
@@ -310,10 +310,10 @@ class ComplexLabViewModel : ViewModel() {
                 "Inputs read as rectangular (re, im)."
             }
             val result: Complex? = when (operation) {
-                ComplexOperation.ADD -> a.add(b)
-                ComplexOperation.SUBTRACT -> a.subtract(b)
-                ComplexOperation.MULTIPLY -> a.multiply(b)
-                ComplexOperation.DIVIDE -> a.divide(b)
+                ComplexOperation.ADD -> a + b
+                ComplexOperation.SUBTRACT -> a - b
+                ComplexOperation.MULTIPLY -> a * b
+                ComplexOperation.DIVIDE -> a / b
                 ComplexOperation.CONJUGATE -> a.conjugate()
                 ComplexOperation.MAGNITUDE -> null
                 ComplexOperation.ARGUMENT -> null

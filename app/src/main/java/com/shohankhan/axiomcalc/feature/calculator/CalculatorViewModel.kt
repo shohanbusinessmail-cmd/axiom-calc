@@ -140,7 +140,14 @@ open class CalculatorViewModel(
         }
     }
 
-    private fun mutate(block: CalculatorBuffer.() -> Unit, hapticStrong: Boolean = false) {
+    /**
+     * Applies [block] to the buffer, then refreshes the display.
+     *
+     * The lambda is the LAST parameter on purpose: Kotlin binds a trailing
+     * lambda to the final parameter only, so `mutate { ... }` would otherwise
+     * be matched against `hapticStrong` and fail to compile.
+     */
+    private fun mutate(hapticStrong: Boolean = false, block: CalculatorBuffer.() -> Unit) {
         buffer.block()
         if (_state.value.evaluated) _state.update { it.copy(evaluated = false) }
         refresh()
@@ -356,7 +363,7 @@ open class CalculatorViewModel(
         text.forEach { ch ->
             when {
                 ch.isDigit() -> buffer.pressDigit(ch)
-                ch in "+-*/^" -> buffer.pressOperator(ch)
+                ch in "+-*/^" -> buffer.pressOperator(ch.toString())
                 else -> Unit
             }
         }
@@ -374,7 +381,7 @@ open class CalculatorViewModel(
         return when {
             ch.isDigit() -> { onDigit(ch); true }
             ch == '.' || ch == ',' -> { onDecimalPoint(); true }
-            ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^' -> { onOperator(ch); true }
+            ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^' -> { onOperator(ch.toString()); true }
             ch == 'x' || ch == 'X' -> { onOperator("*"); true }
             ch == '(' -> { onOpenParen(); true }
             ch == ')' -> { onCloseParen(); true }
@@ -479,7 +486,7 @@ open class CalculatorViewModel(
             when {
                 ch.isDigit() -> buffer.pressDigit(ch)
                 ch == '.' -> buffer.pressDecimalPoint()
-                ch in "+-*/^" -> buffer.pressOperator(ch)
+                ch in "+-*/^" -> buffer.pressOperator(ch.toString())
                 ch == '(' -> buffer.pressOpenParen()
                 ch == ')' -> buffer.pressCloseParen()
                 ch == '%' -> buffer.pressPercent()

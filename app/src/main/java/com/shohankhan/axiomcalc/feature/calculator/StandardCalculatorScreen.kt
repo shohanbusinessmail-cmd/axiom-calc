@@ -1,5 +1,6 @@
 package com.shohankhan.axiomcalc.feature.calculator
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -100,21 +100,26 @@ fun StandardCalculatorScreen(
 
     Box(Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val landscape = maxWidth > maxHeight
+            // ColumnScope and RowScope are annotated @LayoutScopeMarker, which
+            // forbids implicit access to the outer BoxWithConstraintsScope
+            // receiver. Capturing the metrics as locals keeps them visible in
+            // every nested layout scope below.
+            val availableHeight = maxHeight
+            val landscape = maxWidth > availableHeight
             if (landscape) {
                 Row(Modifier.fillMaxSize().padding(horizontal = AxiomDimens.ScreenPadding)) {
                     Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         CalculatorDisplay(state, viewModel)
                     }
                     Column(Modifier.weight(1f)) {
-                        StandardKeypad(state, viewModel, compact = maxHeight < 420.dp)
+                        StandardKeypad(state, viewModel, compact = availableHeight < 420.dp)
                     }
                 }
             } else {
                 Column(Modifier.fillMaxSize().padding(horizontal = AxiomDimens.ScreenPadding)) {
                     CalculatorDisplay(state, viewModel)
                     Spacer(Modifier.height(AxiomDimens.ListGap))
-                    StandardKeypad(state, viewModel, compact = maxHeight < 620.dp)
+                    StandardKeypad(state, viewModel, compact = availableHeight < 620.dp)
                 }
             }
         }

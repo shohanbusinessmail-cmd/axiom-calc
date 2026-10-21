@@ -59,10 +59,11 @@ fun ToolRunnerPanel(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (spec.formulaText != null) {
+            val formulaText = spec.formulaText
+            if (formulaText != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = spec.formulaText,
+                    text = formulaText,
                     style = MaterialTheme.typography.bodyLarge,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,

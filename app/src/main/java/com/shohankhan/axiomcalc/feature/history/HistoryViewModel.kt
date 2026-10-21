@@ -37,6 +37,14 @@ data class HistoryUiState(
 
 data class HistoryGroup(val label: String, val entries: List<HistoryEntry>)
 
+/** Snapshot of the four user-controlled history filters, for `combine`. */
+private data class HistoryFilters(
+    val query: String,
+    val filter: HistoryFilter,
+    val origins: Set<CalcOrigin>,
+    val selectedIds: Set<Long>,
+)
+
 /**
  * History ViewModel.
  *
@@ -60,24 +68,29 @@ class HistoryViewModel(
         if (q.isBlank()) repository.observeAll() else repository.observeSearch(q)
     }
 
+    /**
+     * The five independent inputs of this screen combined in two steps.
+     *
+     * `kotlinx.coroutines.flow.combine` provides typed overloads for two to
+     * five flows and only an untyped `Array` overload beyond that, so the four
+     * user-controlled filters are folded into one value first. The result is a
+     * strongly-typed six-way combination instead of an `Array<Any?>`.
+     */
     val state: StateFlow<HistoryUiState> = combine(
         rows,
-        query,
-        filter,
-        origins,
-        selected,
+        combine(query, filter, origins, selected) { q, f, org, sel -> HistoryFilters(q, f, org, sel) },
         settingsRepository.settings,
-    ) { entries, q, f, org, sel, settings ->
-        val window = f.windowStart(System.currentTimeMillis())
+    ) { entries, filters, settings ->
+        val window = filters.filter.windowStart(System.currentTimeMillis())
         val visible = entries
-            .filter { it.origin in org }
+            .filter { it.origin in filters.origins }
             .filter { window == null || it.timestampMillis >= window }
         HistoryUiState(
             groups = groupByDay(visible),
-            query = q,
-            filter = f,
-            origins = org,
-            selectedIds = sel,
+            query = filters.query,
+            filter = filters.filter,
+            origins = filters.origins,
+            selectedIds = filters.selectedIds,
             totalRows = entries.size,
             retention = settings.retention,
         )

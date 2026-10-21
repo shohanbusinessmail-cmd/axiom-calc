@@ -21,6 +21,24 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOLS="${AXIOM_TOOLCHAIN_DIR:-$HOME/.cache/axiomtool}"
 FILTER="${1:-}"
 
+# ---------------------------------------------------------------------------
+#  Static gates. These need no toolchain, so they run first and fail fast.
+#  Both exist because a real Android build exposed defects that no local
+#  syntax-only sweep could see:
+#    validate_resources.py - a vector tint referencing a theme attribute the
+#                            applied theme does not define, which aborts aapt2
+#                            resource linking for the whole app;
+#    validate_imports.py   - 96 Kotlin compile errors, almost all missing or
+#                            wrong-package imports, which abort compilation
+#                            before a single test can run.
+# ---------------------------------------------------------------------------
+echo ">> static check: resources"
+python3 "$ROOT/tools/validate_resources.py"
+echo
+echo ">> static check: imports"
+python3 "$ROOT/tools/validate_imports.py"
+echo
+
 if [[ ! -x "$TOOLS/jdk17/bin/java" || ! -x "$TOOLS/kotlinc/bin/kotlinc" ]]; then
   bash "$ROOT/tools/bootstrap-verification-toolchain.sh"
 fi
