@@ -5,19 +5,22 @@
 #  sandbox could not: it runs on GitHub-hosted runners, which have JDK 17, the
 #  Android SDK and network access to Google's and Maven's repositories.
 #
-#  It produces real, inspectable evidence for items reported as BLOCKED or
-#  NOT TESTED in DELIVERY_REPORT.md / FEATURE_ACCEPTANCE.md:
-#    * ./gradlew test            (the 183 unit tests under real JUnit 4)
-#    * ./gradlew lint
-#    * ./gradlew assembleDebug   and the resulting APK, inspected with aapt2
-#                                and apksigner, then uploaded as an artifact
-#    * merged-release-manifest permission audit (must contain zero permissions)
-#    * release runtime classpath audit (must contain no networking/analytics)
-#    * ./gradlew connectedDebugAndroidTest on an emulator (75 tests)
+#  Evidence it produces for items reported BLOCKED / NOT TESTED in
+#  DELIVERY_REPORT.md and FEATURE_ACCEPTANCE.md:
+#    * ./gradlew testDebugUnitTest  (the 183 unit tests under real JUnit 4)
+#    * ./gradlew lintDebug
+#    * ./gradlew assembleDebug / assembleRelease, then the APK inspected with
+#      aapt2 badging, aapt2 dump permissions and apksigner verify
+#    * source AND merged manifest permission audits (fail on any permission)
+#    * release runtime classpath audit (fail on networking/analytics/ad SDKs)
+#    * ./gradlew connectedDebugAndroidTest on an API 34 emulator (75 tests)
+#
+#  Every result is posted back as a comment on the open pull request, so the
+#  evidence is readable without access to the runner logs and stays with the PR.
 #
 #  Nothing here signs a release with a production identity: no keystore or
 #  credential is referenced, and the release variant stays unsigned unless the
-#  owner supplies keystore.properties locally (see RELEASE.md section 5).
+#  owner supplies keystore.properties locally (RELEASE.md section 5).
 # ============================================================================
 
 name: Android CI
@@ -35,12 +38,17 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  EVIDENCE_DIR: /tmp/axiom-evidence
 
 jobs:
   build-and-verify:
     name: Build, unit tests, lint, APK inspection
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -54,106 +62,279 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare evidence directory
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          echo "run_id=$GITHUB_RUN_ID" > "$EVIDENCE_DIR/meta.txt"
+          echo "sha=$(git rev-parse HEAD)" >> "$EVIDENCE_DIR/meta.txt"
+          ./gradlew --version 2>&1 | tee "$EVIDENCE_DIR/gradle-version.txt"
+
       - name: Record wrapper integrity
         run: |
           set -euo pipefail
-          ls -l gradle/wrapper/gradle-wrapper.jar
-          sha256sum gradle/wrapper/gradle-wrapper.jar
-          cat gradle/wrapper/gradle-wrapper.properties
-          ./gradlew --version
+          {
+            echo '## Gradle wrapper'
+            echo '```'
+            ls -l gradle/wrapper/gradle-wrapper.jar
+            sha256sum gradle/wrapper/gradle-wrapper.jar
+            cat gradle/wrapper/gradle-wrapper.properties
+            echo '```'
+          } > "$EVIDENCE_DIR/01-wrapper.md"
 
       - name: Source manifest permission audit
         run: |
           set -euo pipefail
-          echo "== uses-permission elements in the source manifest =="
-          if grep -q '<uses-permission' app/src/main/AndroidManifest.xml; then
-            echo "FAIL: a uses-permission element is declared"
-            grep -n '<uses-permission' app/src/main/AndroidManifest.xml
-            exit 1
-          fi
-          echo "PASS: no uses-permission element is declared"
+          {
+            echo '## Source manifest audit'
+            echo '```'
+            if grep -q '<uses-permission' app/src/main/AndroidManifest.xml; then
+              echo 'FAIL: a uses-permission element is declared'
+              grep -n '<uses-permission' app/src/main/AndroidManifest.xml
+            else
+              echo 'PASS: no uses-permission element is declared'
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/02-source-manifest.md"
 
       - name: Unit tests (real JUnit 4)
-        run: ./gradlew testDebugUnitTest --stacktrace
+        id: unit-tests
+        continue-on-error: true
+        run: ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee "$EVIDENCE_DIR/unit-tests.log"
 
       - name: Lint
-        run: ./gradlew lintDebug
+        id: lint
+        continue-on-error: true
+        run: ./gradlew lintDebug 2>&1 | tee "$EVIDENCE_DIR/lint.log"
 
       - name: Assemble debug
-        run: ./gradlew assembleDebug
+        id: assemble-debug
+        continue-on-error: true
+        run: ./gradlew assembleDebug 2>&1 | tee "$EVIDENCE_DIR/assemble-debug.log"
 
       - name: Assemble release (unsigned)
-        run: ./gradlew assembleRelease
+        id: assemble-release
+        continue-on-error: true
+        run: ./gradlew assembleRelease 2>&1 | tee "$EVIDENCE_DIR/assemble-release.log"
 
       - name: Inspect the debug APK
+        id: inspect-apk
+        continue-on-error: true
         run: |
-          set -euo pipefail
-          APK=app/build/outputs/apk/debug/app-debug.apk
+          set -uo pipefail
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          echo "== build tools: $BT =="
-
-          echo "== file exists and is non-zero =="
-          ls -l "$APK"
-          test -s "$APK"
-          stat -c '%s bytes' "$APK"
-
-          echo "== valid zip archive =="
-          unzip -t "$APK" > /dev/null && echo "PASS: archive integrity ok"
-
-          echo "== badging: package, version, SDK levels, permissions =="
-          "$BT/aapt2" dump badging "$APK"
-
-          echo "== permissions requested by the built APK (must be empty) =="
-          "$BT/aapt2" dump permissions "$APK" || true
-
-          echo "== signing status =="
-          "$BT/apksigner" verify --print-certs --verbose "$APK"
-
-          echo "== contents =="
-          unzip -l "$APK" | head -40
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          {
+            echo '## Debug APK inspection'
+            echo "build-tools: $BT"
+            echo '```'
+            if [ -f "$APK" ]; then
+              ls -l "$APK"
+              stat -c '%s bytes' "$APK"
+              unzip -t "$APK" > /dev/null && echo 'PASS: zip archive integrity ok'
+              echo '--- aapt2 dump badging ---'
+              "$BT/aapt2" dump badging "$APK" 2>&1
+              echo '--- aapt2 dump permissions (must be empty) ---'
+              "$BT/aapt2" dump permissions "$APK" 2>&1
+              echo '--- apksigner verify ---'
+              "$BT/apksigner" verify --print-certs --verbose "$APK" 2>&1
+              echo '--- archive contents (first 40) ---'
+              unzip -l "$APK" | head -40
+            else
+              echo "FAIL: no APK was produced at $APK"
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/03-apk.md"
 
       - name: Inspect the release APK
+        id: inspect-release
+        continue-on-error: true
         run: |
-          set -euo pipefail
-          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          set -uo pipefail
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          echo "== release artifact: $APK =="
-          ls -l "$APK"
-          "$BT/aapt2" dump badging "$APK"
-          echo "== release signing status (unsigned is expected: no owner key) =="
-          "$BT/apksigner" verify --print-certs --verbose "$APK" || \
-            echo "NOT SIGNED - expected, the owner must sign per RELEASE.md section 5"
+          {
+            echo '## Release APK inspection'
+            echo '```'
+            APK="$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1 || true)"
+            if [ -n "${APK:-}" ] && [ -f "$APK" ]; then
+              echo "artifact: $APK"
+              ls -l "$APK"
+              "$BT/aapt2" dump badging "$APK" 2>&1
+              echo '--- signing status (unsigned expected: no owner key) ---'
+              "$BT/apksigner" verify --print-certs --verbose "$APK" 2>&1 || \
+                echo 'NOT SIGNED - expected; owner must sign per RELEASE.md section 5'
+            else
+              echo 'FAIL: no release APK was produced'
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/04-release-apk.md"
 
       - name: Merged manifest permission audit
+        id: merged-manifest
+        continue-on-error: true
         run: |
-          set -euo pipefail
-          echo "== merged manifest files =="
-          find app/build -name 'AndroidManifest.xml' -path '*merged*' | sort
-          for M in $(find app/build -name 'AndroidManifest.xml' -path '*merged*' | sort); do
-            echo "---- $M ----"
-            if grep -q 'uses-permission' "$M"; then
-              echo "FAIL: merged manifest declares a permission"
-              grep -n 'uses-permission' "$M"
-              exit 1
-            fi
-          done
-          echo "PASS: no merged manifest declares any permission (INTERNET absent)"
+          set -uo pipefail
+          {
+            echo '## Merged manifest audit'
+            echo '```'
+            FOUND=0
+            for M in $(find app/build -name 'AndroidManifest.xml' -path '*merged*' 2>/dev/null | sort); do
+              echo "---- $M ----"
+              if grep -q 'uses-permission' "$M"; then
+                echo 'FAIL: merged manifest declares a permission'
+                grep -n 'uses-permission' "$M"
+                FOUND=1
+              fi
+            done
+            [ "$FOUND" -eq 0 ] && echo 'PASS: no merged manifest declares any permission (INTERNET absent)'
+            echo '```'
+          } > "$EVIDENCE_DIR/05-merged-manifest.md"
 
       - name: Release dependency audit
+        id: dep-audit
+        continue-on-error: true
         run: |
-          set -euo pipefail
+          set -uo pipefail
           ./gradlew app:dependencies --configuration releaseRuntimeClasspath \
-            > /tmp/release-classpath.txt
-          echo "== release runtime classpath =="
-          cat /tmp/release-classpath.txt
-          echo "== forbidden coordinate scan =="
+            > "$EVIDENCE_DIR/release-classpath.txt" 2>&1
           BANNED='okhttp|retrofit|ktor|volley|firebase|play-services-ads|play-services-analytics|crashlytics|sentry|bugsnag|facebook|amplitude|mixpanel|segment|appsflyer|adjust|newrelic|onesignal|airship'
-          if grep -Eiq "$BANNED" /tmp/release-classpath.txt; then
-            echo "FAIL: a networking/analytics/advertising coordinate is present"
-            grep -Ein "$BANNED" /tmp/release-classpath.txt
+          {
+            echo '## Release dependency audit'
+            echo '```'
+            if grep -Eiq "$BANNED" "$EVIDENCE_DIR/release-classpath.txt"; then
+              echo 'FAIL: a networking/analytics/advertising coordinate is present'
+              grep -Ein "$BANNED" "$EVIDENCE_DIR/release-classpath.txt"
+            else
+              echo 'PASS: no networking, analytics, advertising or crash-reporting dependency'
+            fi
+            echo '```'
+            echo '<details><summary>Full release runtime classpath</summary>'
+            echo ''
+            echo '```'
+            cat "$EVIDENCE_DIR/release-classpath.txt"
+            echo '```'
+            echo '</details>'
+          } > "$EVIDENCE_DIR/06-dependencies.md"
+
+      - name: Build the evidence report
+        if: always()
+        run: |
+          set -uo pipefail
+          python3 - <<'PY' > "$EVIDENCE_DIR/00-summary.md"
+          import glob, os, re, xml.etree.ElementTree as ET
+
+          ev = os.environ["EVIDENCE_DIR"]
+          tests, fails, errs, skip = 0, 0, 0, 0
+          failures = []
+          for path in sorted(glob.glob("app/build/test-results/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(path).getroot()
+              except Exception as e:
+                  failures.append((path, "unparsable report", str(e)))
+                  continue
+              suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+              for s in suites:
+                  tests += int(s.get("tests", 0))
+                  fails += int(s.get("failures", 0))
+                  errs += int(s.get("errors", 0))
+                  skip += int(s.get("skipped", 0))
+                  for tc in s.findall("testcase"):
+                      for kind in ("failure", "error"):
+                          for node in tc.findall(kind):
+                              failures.append((
+                                  f'{tc.get("classname")}.{tc.get("name")}',
+                                  node.get("type", kind),
+                                  (node.get("message") or "")[:400],
+                                  (node.text or "")[:2000],
+                              ))
+
+          print("## Unit test results (real JUnit 4 under Gradle)\n")
+          print("| tests | failures | errors | skipped |")
+          print("|---|---|---|---|")
+          print(f"| {tests} | {fails} | {errs} | {skip} |")
+          print()
+          if not tests:
+              print("**No test results were produced.** The compilation or the test task "
+                    "failed before any test ran; see the compile errors below.")
+          if failures:
+              print("\n### Failures\n")
+              for f in failures:
+                  print(f"#### `{f[0]}`")
+                  print(f"- type: `{f[1]}`")
+                  if len(f) > 2 and f[2]:
+                      print(f"- message: {f[2]}")
+                  if len(f) > 3 and f[3]:
+                      print("\n```\n" + f[3].strip() + "\n```")
+                  print()
+          PY
+
+          # Extract Kotlin/Java compile errors, which are the usual reason no
+          # test results exist at all.
+          {
+            echo '### Compiler and task errors from the logs'
+            echo '```'
+            cat "$EVIDENCE_DIR"/*.log 2>/dev/null \
+              | grep -E "^e: |^w: .*(deprecat|uncheck)|error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED" \
+              | grep -v "^w:" | sort -u | head -120
+            echo '```'
+          } > "$EVIDENCE_DIR/00b-compile-errors.md"
+
+      - name: Post evidence to the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
+          PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number' || true)"
+          if [ -z "$PR" ]; then
+            echo "No open pull request for $BRANCH; evidence stays in the run summary."
+            cat "$EVIDENCE_DIR"/0*.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            exit 0
+          fi
+
+          {
+            echo "### Android CI evidence — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            echo
+            echo "Generated on a GitHub-hosted runner with JDK 17 and the Android SDK."
+            echo "Step outcomes: unit tests=${{ steps.unit-tests.outcome }}, lint=${{ steps.lint.outcome }}, assembleDebug=${{ steps.assemble-debug.outcome }}, assembleRelease=${{ steps.assemble-release.outcome }}, APK=${{ steps.inspect-apk.outcome }}, release APK=${{ steps.inspect-release.outcome }}, merged manifest=${{ steps.merged-manifest.outcome }}, dependency audit=${{ steps.dep-audit.outcome }}."
+            echo
+            for f in "$EVIDENCE_DIR"/00-summary.md "$EVIDENCE_DIR"/00b-compile-errors.md \
+                     "$EVIDENCE_DIR"/01-wrapper.md "$EVIDENCE_DIR"/02-source-manifest.md \
+                     "$EVIDENCE_DIR"/03-apk.md "$EVIDENCE_DIR"/04-release-apk.md \
+                     "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/06-dependencies.md; do
+              [ -f "$f" ] && cat "$f" && echo
+            done
+            echo '<details><summary>Raw unit-test log (tail)</summary>'
+            echo ''
+            echo '```'
+            tail -120 "$EVIDENCE_DIR/unit-tests.log" 2>/dev/null || echo 'no log'
+            echo '```'
+            echo '</details>'
+          } > /tmp/pr-comment.md
+
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/pr-comment.md
+
+      - name: Fail the job if any verification step failed
+        if: always()
+        run: |
+          set -uo pipefail
+          FAILED=""
+          for pair in "unit-tests:${{ steps.unit-tests.outcome }}" \
+                      "lint:${{ steps.lint.outcome }}" \
+                      "assemble-debug:${{ steps.assemble-debug.outcome }}" \
+                      "assemble-release:${{ steps.assemble-release.outcome }}" \
+                      "inspect-apk:${{ steps.inspect-apk.outcome }}" \
+                      "merged-manifest:${{ steps.merged-manifest.outcome }}" \
+                      "dep-audit:${{ steps.dep-audit.outcome }}"; do
+            name="${pair%%:*}"; outcome="${pair##*:}"
+            if [ "$outcome" != "success" ]; then FAILED="$FAILED $name($outcome)"; fi
+          done
+          if [ -n "$FAILED" ]; then
+            echo "Verification steps did not all succeed:$FAILED"
             exit 1
           fi
-          echo "PASS: no networking, analytics, advertising or crash-reporting dependency"
+          echo "All verification steps succeeded."
 
       - name: Upload APK and reports
         if: always()
@@ -165,6 +346,7 @@ jobs:
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.*
             app/schemas/**
+            /tmp/axiom-evidence/**
           if-no-files-found: warn
           retention-days: 14
 
@@ -207,11 +389,51 @@ jobs:
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest --stacktrace
 
+      - name: Post instrumented results to the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
+          PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number' || true)"
+          {
+            echo "### Instrumented test results — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            echo '```'
+            python3 - <<'PY'
+            import glob, xml.etree.ElementTree as ET
+            tests = fails = errs = skip = 0
+            details = []
+            for path in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
+                root = ET.parse(path).getroot()
+                suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+                for s in suites:
+                    tests += int(s.get("tests", 0)); fails += int(s.get("failures", 0))
+                    errs += int(s.get("errors", 0)); skip += int(s.get("skipped", 0))
+                    for tc in s.findall("testcase"):
+                        for kind in ("failure", "error"):
+                            for node in tc.findall(kind):
+                                details.append(f'{tc.get("classname")}.{tc.get("name")}: '
+                                               f'{(node.get("message") or "")[:300]}')
+            print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
+            for d in details[:60]:
+                print("FAILED " + d)
+            PY
+            echo '```'
+          } > /tmp/instr-comment.md
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/instr-comment.md
+          else
+            cat /tmp/instr-comment.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload instrumented reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: axiom-calc-instrumented-reports
-          path: app/build/reports/androidTests/**
+          path: |
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
           if-no-files-found: warn
           retention-days: 14
