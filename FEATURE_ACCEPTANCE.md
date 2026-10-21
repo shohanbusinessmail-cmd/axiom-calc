@@ -247,23 +247,29 @@ unverified item is marked BLOCKED or NOT TESTED rather than PASS.
 
 ## Summary
 
-| Area | PASS | FAIL | BLOCKED | NOT TESTED / NOT MEASURED |
-|------|------|------|---------|---------------------------|
-| Identity and platform (A) | 7 | 0 | 0 | 0 |
-| Toolchain and build (B) | 5 | 0 | 6 | 1 |
-| Standard Calculator (C) | 16 | 0 | 0 | 0 (1 code-PASS with device NOT TESTED) |
-| Scientific (D) | 11 | 0 | 0 | 0 |
-| Formulas (E) | 18 | 0 | 0 | 0 |
-| Quick Solve (F) | 7 | 0 | 0 | 0 |
-| Library (G) | 6 | 0 | 0 | 0 |
-| Math Lab (H) | 6 | 0 | 0 | 0 |
-| Persistence (I) | 12 | 0 | 0 | 0 (1 code-PASS with device NOT TESTED) |
-| Architecture (J) | 14 | 0 | 0 | 0 |
-| Accessibility (K) | 2 | 0 | 0 | 5 code-PASS / device NOT TESTED |
-| Offline and privacy (L) | 9 | 0 | 2 | 0 (1 code-PASS with device NOT TESTED) |
-| Tests (M) | 5 | 0 | 2 | 2 |
-| Documentation (N) | 8 | 0 | 0 | 0 |
-| Version control (O) | 6 | 0 | 0 | 0 |
+| Area | PASS | FAIL | BLOCKED | NOT TESTED / NOT MEASURED | Total |
+|------|------|------|---------|---------------------------|-------|
+| A. Identity and platform | 7 | 0 | 0 | 0 | 7 |
+| B. Toolchain and build | 6 | 0 | 6 | 1 | 13 |
+| C. Standard Calculator | 15 | 0 | 0 | 1 | 16 |
+| D. Scientific Calculator | 11 | 0 | 0 | 0 | 11 |
+| E. Formula Calculator | 18 | 0 | 0 | 0 | 18 |
+| F. Quick Solve | 7 | 0 | 0 | 0 | 7 |
+| G. Formula Library | 6 | 0 | 0 | 0 | 6 |
+| H. Math Lab | 6 | 0 | 0 | 0 | 6 |
+| I. Persistence | 11 | 0 | 0 | 1 | 12 |
+| J. Architecture and quality | 14 | 0 | 0 | 0 | 14 |
+| K. Accessibility and responsiveness | 2 | 0 | 0 | 5 | 7 |
+| L. Offline and privacy | 8 | 0 | 2 | 1 | 11 |
+| M. Tests | 5 | 0 | 1 | 2 | 8 |
+| N. Documentation | 8 | 0 | 0 | 0 | 8 |
+| O. Version control | 6 | 0 | 0 | 0 | 6 |
+| **Total (150 criteria)** | **130** | **0** | **9** | **11** | **150** |
+
+Counts were produced by parsing every criterion row in the tables above, not by
+hand. A criterion marked "PASS (code) / NOT TESTED (device)" is counted once, in
+the NOT TESTED column, so no claim is double-counted: the implementation is
+delivered and the device verification is honestly outstanding.
 
 **No criterion is FAIL.** No known unresolved critical or high-severity *code*
 defect is open.
@@ -274,8 +280,8 @@ SDK repositories:
 
 1. No APK was built (B5–B9). **Source-repo completion and APK delivery are
    separate acceptance criteria; the second is not met.**
-2. The instrumented suite (75 tests) has never run (M5, and the device halves of
-   C12, I9, K1–K7, L4, L7).
+2. The instrumented suite (75 tests) has never run (M5), together with the
+   device-dependent criteria C12, I9, K1–K7, L4 and L7.
 3. The merged release manifest and the Gradle dependency report have not been
    audited on a real build (L2, L3) — the highest-severity residual risk, because
    a transitive dependency could in principle add a permission at merge time.
