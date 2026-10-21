@@ -48,6 +48,8 @@ jobs:
   build-and-verify:
     name: Build, unit tests, lint, APK inspection
     runs-on: ubuntu-latest
+    outputs:
+      apk-built: ${{ steps.assemble-debug.outputs.apk }}
     timeout-minutes: 60
 
     steps:
@@ -221,6 +223,15 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew assembleDebug 2>&1 | tee "$EVIDENCE_DIR/assemble-debug.log"
+          STATUS=$?
+          # Published so the emulator job can decide on the thing it actually
+          # needs - a debug APK - instead of on this whole job's conclusion.
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "apk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apk=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit $STATUS
 
       - name: Assemble release (unsigned)
         id: assemble-release
@@ -440,9 +451,20 @@ jobs:
           {
             echo '### Compiler and task errors from the logs'
             echo '```'
-            cat "$EVIDENCE_DIR"/*.log 2>/dev/null \
-              | grep -E "^e: |^w: .*(deprecat|uncheck)|error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED" \
-              | grep -v "^w:" | sort -u | head -120
+            # GitHub Actions runs every bash step with -e, so a grep that matches
+            # NOTHING aborts the step. That is exactly what a clean build looks
+            # like: this step failed for the first time only once the project
+            # compiled, tested, linted and packaged without a single error, and
+            # its failure then skipped the whole emulator job. Each stage is
+            # guarded so "no matches" is reported as the good news it is.
+            ERRORS="$(cat "$EVIDENCE_DIR"/*.log 2>/dev/null \
+              | { grep -E "^e: |^w: .*(deprecat|uncheck)|error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED" || true; } \
+              | { grep -v "^w:" || true; } | sort -u | head -120)"
+            if [ -n "$ERRORS" ]; then
+              printf '%s\n' "$ERRORS"
+            else
+              echo 'none - no compiler error, no compiler warning and no failed task in any log'
+            fi
             echo '```'
           } > "$EVIDENCE_DIR/00b-compile-errors.md"
 
@@ -472,7 +494,9 @@ jobs:
                      "$EVIDENCE_DIR"/03-apk.md "$EVIDENCE_DIR"/04-release-apk.md \
                      "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/05b-lint.md \
                      "$EVIDENCE_DIR"/06-dependencies.md; do
-              [ -f "$f" ] && cat "$f" && echo
+              # Not `[ -f "$f" ] && cat "$f"`: under the implicit `set -e` a
+              # missing file would abort the step and lose the entire report.
+              if [ -f "$f" ]; then cat "$f"; echo; fi
             done
             echo '<details><summary>Raw unit-test log (tail)</summary>'
             echo ''
@@ -525,6 +549,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     needs: build-and-verify
+    # `always()` plus an explicit output test, rather than the default `needs`
+    # behaviour. A failure anywhere in the build job - including in a step that
+    # only formats evidence - used to skip all 75 instrumented tests silently.
+    # What the emulator genuinely needs is a debug APK, so that is what is
+    # checked. A job skipped by this condition is reported as skipped, never as
+    # passed, and the comment it posts states how many tests actually ran.
+    if: always() && needs.build-and-verify.outputs.apk-built == 'true'
 
     steps:
       - uses: actions/checkout@v4

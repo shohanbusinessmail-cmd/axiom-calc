@@ -16,7 +16,7 @@ Axiom Calc - Kotlin import validation
 ========================================================================
 Kotlin files scanned ...... 77
 Imported names indexed .... 339
-Top-level declarations .... 1671
+Top-level declarations .... 1672
 Member names suppressed ... 158
 ------------------------------------------------------------------------
 No missing or ambiguous imports detected.

@@ -19,6 +19,11 @@ This tool checks, for every workflow:
     here-document as "here-document delimited by end-of-file");
   * every python heredoc inside a `run` script compiles;
   * every piped step that is meant to be verified sets `pipefail`;
+  * no command that can legitimately exit non-zero stands alone. GitHub runs
+    every bash step as `bash -e -o pipefail`, so a `grep` that matches nothing,
+    or a `[ -f x ] && cat x` test that is false, kills the step. That is how a
+    clean build first broke the evidence step here and silently skipped 75
+    instrumented tests;
   * every step id referenced by an expression actually exists in the job.
 
 Requires PyYAML. Usage: python3 tools/validate_workflow.py
@@ -37,6 +42,17 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = sorted((ROOT / ".github/workflows").glob("*.yml"))
 
 HEREDOC_RE = re.compile(r"^\s*python3 - <<'?(\w+)'?\s*$", re.MULTILINE)
+
+# A command whose non-zero exit is a normal outcome, standing alone under
+# `set -e`. `grep` exiting 1 means "no match"; `[ -f x ] && ...` exiting 1
+# means "the file is absent". Both are legitimate results that must be guarded.
+UNGUARDED_RE = re.compile(
+    r"(?<![|&!\w-])"                     # not already after a pipe/and/not
+    r"(?:\bgrep\b|\[\s[^\]]*\]\s*&&)",
+)
+CONDITION_PREFIX_RE = re.compile(
+    r"^\s*(?:if|elif|while|until|then|else|do|!)\b")
+GUARD_RE = re.compile(r"\|\|\s*(?:true|:)\b|\|\|\s*\w+=|&&\s*(?:true|:)\b")
 STEP_REF_RE = re.compile(r"steps\.([A-Za-z0-9_-]+)\.")
 
 
@@ -86,6 +102,37 @@ def main() -> int:
                 if not run:
                     continue
                 checked_scripts += 1
+
+                # Commands whose failure is a normal result must be guarded,
+                # because GitHub Actions runs `bash -e -o pipefail`.
+                joined = re.sub(r"\\\n\s*", " ", run)
+                # Track whether we are inside an `if`/`while` body, where a
+                # non-zero status is the point of the command, or inside a
+                # `for` body, where it is not.
+                blocks: list[str] = []
+                for ln, raw_line in enumerate(joined.split("\n"), 1):
+                    stripped = raw_line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    if re.match(r"^(?:if|while|until)\b", stripped):
+                        blocks.append("cond")
+                    elif re.match(r"^for\b", stripped):
+                        blocks.append("loop")
+                    elif re.match(r"^(?:fi|done)\b", stripped):
+                        if blocks:
+                            blocks.pop()
+                    if "cond" in blocks:
+                        continue
+                    if CONDITION_PREFIX_RE.match(raw_line):
+                        continue
+                    if GUARD_RE.search(stripped):
+                        continue
+                    if UNGUARDED_RE.search(stripped):
+                        problems.append(
+                            f"{rel}:{job_name}/{label} line {ln}: a grep or "
+                            f"`[ ... ] &&` stands alone, and GitHub runs bash "
+                            f"with -e, so a non-match fails the step: "
+                            f"{stripped[:120]}")
 
                 # A step that pipes into tee must set pipefail, otherwise the
                 # step outcome reports tee's status instead of the tool's.

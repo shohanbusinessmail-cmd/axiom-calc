@@ -66,12 +66,25 @@ sealed interface CalculatorEvent {
  * never fed back into the engine.
  */
 open class CalculatorViewModel(
-    private val context: Context,
+    context: Context,
     private val settingsRepository: SettingsRepository,
     private val historyRepository: HistoryRepository,
     private val savedRepository: SavedCalculationRepository,
     private val origin: CalcOrigin,
 ) : ViewModel() {
+
+    /**
+     * The clipboard service, resolved once at construction.
+     *
+     * A ViewModel deliberately outlives the Activity that created it, so it must
+     * not retain a [Context] field - Android lint reports that as
+     * StaticFieldLeak and it is a real leak whenever an Activity context is
+     * passed. Only the application context ever reaches this constructor (see
+     * `axiomViewModel`), and from it the one system service this class needs is
+     * taken immediately and the context itself is dropped.
+     */
+    private val clipboard: ClipboardManager? =
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
 
     private val buffer = CalculatorBuffer()
     private var ans: CalcNumber = CalcNumber.ZERO
@@ -463,8 +476,7 @@ open class CalculatorViewModel(
 
     private fun copyToClipboard(label: String, text: String) {
         runCatching {
-            val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                ?: return@runCatching
+            val manager = clipboard ?: return@runCatching
             manager.setPrimaryClip(ClipData.newPlainText(label, text))
             // Android 13+ shows its own confirmation; below that we confirm in-app.
             if (android.os.Build.VERSION.SDK_INT < 33) {
@@ -499,8 +511,7 @@ open class CalculatorViewModel(
 
     /** Text currently on the clipboard, for the paste affordance. */
     fun clipboardText(): String? = runCatching {
-        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            ?: return@runCatching null
+        val manager = clipboard ?: return@runCatching null
         val item = manager.primaryClip?.getItemAt(0) ?: return@runCatching null
         item.text?.toString()
     }.getOrNull()
