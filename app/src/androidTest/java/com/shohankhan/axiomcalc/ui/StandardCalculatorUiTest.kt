@@ -1,6 +1,7 @@
 package com.shohankhan.axiomcalc.ui
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalComposeUiTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -80,6 +81,11 @@ class StandardCalculatorUiTest {
         compose.onNodeWithText("50").assertIsDisplayed()
     }
 
+    // performKeyInput is @ExperimentalComposeUiTestApi in the Compose version
+    // this project pins (BOM 2024.10.01). It is stable on the androidx main
+    // branch, which is what reading the source there suggests - the compiler in
+    // CI is the authority, not the branch, and it required the opt-in.
+    @OptIn(ExperimentalComposeUiTestApi::class)
     @Test fun hardwareKeyboardDigitsReachTheBuffer() {
         // The keypad requests focus and declares key handling; a physical
         // keyboard must be able to drive it without any on-screen text field.
