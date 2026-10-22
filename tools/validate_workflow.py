@@ -41,7 +41,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = sorted((ROOT / ".github/workflows").glob("*.yml"))
 
-HEREDOC_RE = re.compile(r"^\s*python3 - <<'?(\w+)'?\s*$", re.MULTILINE)
+# Not anchored to the start of a line: a heredoc can also open inside a command
+# substitution (`VAR="$(python3 - <<'TAG' ... )"`), and an anchored pattern
+# silently skipped exactly that case, leaving an embedded python program that
+# nothing ever compiled.
+HEREDOC_RE = re.compile(r"python3 - <<'?(\w+)'?", re.MULTILINE)
 
 # A command whose non-zero exit is a normal outcome, standing alone under
 # `set -e`. `grep` exiting 1 means "no match"; `[ -f x ] && ...` exiting 1
@@ -161,7 +165,16 @@ def main() -> int:
                             f"{rel}:{job_name}/{label}: heredoc {tag} is never "
                             f"terminated at column 0 of the rendered script")
                         continue
-                    body = run[m.end():m.end() + end.start()]
+                    # A heredoc body starts on the line AFTER the opener, and
+                    # the opener may carry redirections
+                    # (`python3 - <<'PY' > out.md`). Slicing from the end of the
+                    # match instead used to feed `> "out.md"` to the compiler as
+                    # python source. Anchoring the pattern to the whole line hid
+                    # this by skipping every heredoc that had a redirection at
+                    # all, which is how two of the six went uncompiled.
+                    nl = run.find("\n", m.end())
+                    body_start = nl + 1 if nl != -1 else m.end()
+                    body = run[body_start:m.end() + end.start()]
                     checked_heredocs += 1
                     try:
                         compile(body, f"{rel}:{job_name}/{label}:{tag}", "exec")

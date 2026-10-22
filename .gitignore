@@ -36,3 +36,8 @@ lint-report-*.html
 # ---- Local verification toolchain (bootstrapped on demand) ----
 verification/.out/
 verification/build/
+
+# Python bytecode from the tools/ validators. One .pyc was committed by mistake
+# and is removed in this commit; without this entry it can come back.
+__pycache__/
+*.py[cod]

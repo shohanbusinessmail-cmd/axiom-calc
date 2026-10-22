@@ -611,7 +611,9 @@ jobs:
           disk-size: 8G
           heap-size: 1024M
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --stacktrace 2>&1 | tee /tmp/connected.log
+          # pipefail is set explicitly: without it the pipeline's status is
+          # tee's, and 40 failing tests were reported as a green job.
+          script: bash -eo pipefail -c './gradlew connectedDebugAndroidTest --stacktrace 2>&1 | tee /tmp/connected.log'
 
       - name: Post instrumented results to the pull request
         if: always()
@@ -651,11 +653,25 @@ jobs:
                   for tc in s.findall("testcase"):
                       for kind in ("failure", "error"):
                           for node in tc.findall(kind):
-                              details.append(f'{tc.get("classname")}.{tc.get("name")}: '
-                                             f'{(node.get("message") or "")[:300]}')
+                              body = node.text or ""
+                              # The message attribute is empty in AndroidJUnit4
+                              # output; the assertion and the first frames of the
+                              # stack are in the element text. Skip `at ...`
+                              # frames so what is left is the actual cause.
+                              head = [l.strip() for l in body.split("\n")
+                                      if l.strip() and not l.strip().startswith("at ")]
+                              cause = " | ".join(head[:3])[:420]
+                              msg = node.get("message") or ""
+                              details.append(f'{tc.get("classname")}.{tc.get("name")}:\n'
+                                             f'    type: {node.get("type", "?")}\n'
+                                             f'    {msg}\n    {cause}')
           print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
-          for d in details[:60]:
+          for d in details[:45]:
               print("FAILED " + d)
+          if len(details) > 45:
+              print(f"... and {len(details) - 45} more failures, listed by name only:")
+              for d in details[45:]:
+                  print("FAILED " + d.split(":")[0])
           if not tests:
               print()
               print("No instrumented test result XML exists. This is NOT TESTED,")
@@ -697,6 +713,25 @@ jobs:
             exit 1
           fi
           echo "Instrumented result files parsed: $XML_COUNT"
+          # Judge the results rather than trusting Gradle's exit status: a piped
+          # task can report success while tests failed.
+          BAD="$(python3 - <<'PYGATE'
+          import glob, xml.etree.ElementTree as ET
+          f = e = t = 0
+          for path in glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True):
+              root = ET.parse(path).getroot()
+              for s in ([root] if root.tag == "testsuite" else root.findall("testsuite")):
+                  t += int(s.get("tests", 0)); f += int(s.get("failures", 0))
+                  e += int(s.get("errors", 0))
+          print(f"{t} {f} {e}")
+          PYGATE
+          )"
+          read -r T F E <<< "$BAD"
+          echo "Instrumented: tests=$T failures=$F errors=$E"
+          if [ "$F" -ne 0 ] || [ "$E" -ne 0 ]; then
+            echo "FAIL: $F failure(s) and $E error(s) out of $T instrumented tests."
+            exit 1
+          fi
 
       - name: Upload instrumented reports
         if: always()

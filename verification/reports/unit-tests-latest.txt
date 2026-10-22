@@ -29,7 +29,7 @@ Axiom Calc - GitHub Actions workflow validation
 ========================================================================
 Workflows checked ......... 1
 run scripts bash -n'd ..... 20
-python heredocs compiled .. 4
+python heredocs compiled .. 6
 ------------------------------------------------------------------------
 No problems found.
 ------------------------------------------------------------------------

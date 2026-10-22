@@ -52,6 +52,16 @@ mkdir -p "$WORK/kc"
 tar xzf "$WORK/kc.tgz" -C "$WORK/kc"
 mv "$WORK/kc/package" "$TOOLS/kotlinc"
 
+# The jdk4py wheel is a zip, and extracting it does not preserve the execute
+# bit on the launcher or the shared libraries. Without this the very next line
+# fails with "Permission denied" on a clean environment, which is how this
+# script was found to be broken: it had only ever been run where the toolchain
+# was already in place.
+echo ">> fixing execute permissions on the extracted JDK ..."
+chmod -R u+x "$TOOLS/jdk17/bin" 2>/dev/null || true
+find "$TOOLS/jdk17" \( -name '*.so' -o -name '*.dylib' \) -exec chmod u+x {} + 2>/dev/null || true
+chmod -R u+x "$TOOLS/kotlinc/bin" 2>/dev/null || true
+
 echo ">> verifying ..."
 "$TOOLS/jdk17/bin/java" -version 2>&1 | head -1
 JAVA_HOME="$TOOLS/jdk17" PATH="$TOOLS/jdk17/bin:$TOOLS/kotlinc/bin:$PATH" kotlinc -version 2>&1 | tail -1
