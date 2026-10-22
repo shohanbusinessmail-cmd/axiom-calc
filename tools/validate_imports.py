@@ -165,6 +165,19 @@ RECEIVER_MEMBERS = {
 GENERATED = {"R", "BuildConfig", "Manifest", "RoomDatabase_Impl",
              "AxiomDatabase_Impl"}
 
+# Simple names that legitimately have more than one top-level declaration, so
+# seeing two different import FQNs across the project is correct rather than
+# suspicious. Each entry is verified against the androidx sources:
+#   width/height  Modifier.width and Modifier.height are extensions in
+#                 compose/foundation/foundation-layout (androidx.compose.foundation.layout),
+#                 while DpRect.width and DpRect.height are separate extensions
+#                 declared at compose/ui/ui-unit/src/commonMain/kotlin/androidx/
+#                 compose/ui/unit/Dp.kt:465 and :470 (androidx.compose.ui.unit).
+#                 A file that measures a node with getUnclippedBoundsInRoot()
+#                 needs the ui.unit pair; a file that sizes a layout needs the
+#                 foundation.layout pair. Both are correct.
+AMBIGUITY_ALLOWED = {"width", "height"}
+
 
 def strip_noise(text: str) -> str:
     """Blank out comments and string/char literals so only code is scanned."""
@@ -278,6 +291,8 @@ def main() -> int:
     ambiguous = []
     for simple, fqns in sorted(import_index.items()):
         if simple in DEFAULT_IMPORTS or simple in RECEIVER_MEMBERS:
+            continue
+        if simple in AMBIGUITY_ALLOWED:
             continue
         external = {f for f in fqns if not f.startswith("com.shohankhan.axiomcalc")}
         if len(external) > 1:
