@@ -1,14 +1,14 @@
 package com.shohankhan.axiomcalc.ui
 
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyPress
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shohankhan.axiomcalc.MainActivity
 import org.junit.Rule
@@ -83,13 +83,20 @@ class StandardCalculatorUiTest {
     @Test fun hardwareKeyboardDigitsReachTheBuffer() {
         // The keypad requests focus and declares key handling; a physical
         // keyboard must be able to drive it without any on-screen text field.
+        // pressKey takes a Compose Key directly. performKeyPress does not: it
+        // takes androidx.compose.ui.input.key.KeyEvent, which is a value class
+        // wrapping an android.view.KeyEvent, so KeyEvent(Key.One) does not
+        // compile. performKeyInput also runs the accessibility checks for the
+        // node it injects into.
         val keypad = compose.onNodeWithContentDescription("Calculator keypad")
-        keypad.performKeyPress(KeyEvent(Key.One))
-        keypad.performKeyPress(KeyEvent(Key.Two))
-        keypad.performKeyPress(KeyEvent(Key.Plus))
-        keypad.performKeyPress(KeyEvent(Key.Three))
-        keypad.performKeyPress(KeyEvent(Key.Zero))
-        keypad.performKeyPress(KeyEvent(Key.Enter))
+        keypad.performKeyInput {
+            pressKey(Key.One)
+            pressKey(Key.Two)
+            pressKey(Key.Plus)
+            pressKey(Key.Three)
+            pressKey(Key.Zero)
+            pressKey(Key.Enter)
+        }
         compose.onNodeWithText("42").assertIsDisplayed()
     }
 
