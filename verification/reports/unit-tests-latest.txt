@@ -35,6 +35,17 @@ No problems found.
 ------------------------------------------------------------------------
 RESULT: PASS
 
+>> static check: Kotlin syntax (all sources)
+========================================================================
+Axiom Calc - Kotlin syntax validation
+========================================================================
+Kotlin sources parsed ..... 79
+Total kotlinc diagnostics . 4057 (unresolved Android types expected)
+Syntax errors ............. 0
+------------------------------------------------------------------------
+RESULT: PASS - every Kotlin source parses. Semantic correctness against
+        the Android SDK is verified by CI, not here.
+
 >> compiling 39 Kotlin sources (core=31 tests=6 shim=2)
 >> running tests
 ====================================================================================================

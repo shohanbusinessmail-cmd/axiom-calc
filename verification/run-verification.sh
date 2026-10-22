@@ -30,7 +30,9 @@ FILTER="${1:-}"
 #                            resource linking for the whole app;
 #    validate_imports.py   - 96 Kotlin compile errors, almost all missing or
 #                            wrong-package imports, which abort compilation
-#                            before a single test can run.
+#                            before a single test can run;
+#    validate_syntax.sh    - a stray closing brace left in an instrumented test
+#                            by an edit, which no other local check can see.
 # ---------------------------------------------------------------------------
 echo ">> static check: resources"
 python3 "$ROOT/tools/validate_resources.py"
@@ -56,6 +58,18 @@ fi
 
 export JAVA_HOME="$TOOLS/jdk17"
 export PATH="$JAVA_HOME/bin:$TOOLS/kotlinc/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+#  Syntax gate. Runs here rather than above because it needs the compiler.
+#  The harness below only compiles the JVM-testable subset, so a syntax error in
+#  an instrumented test or an Android-only screen would never be seen locally:
+#  it would surface in CI as a failed kspDebugAndroidTestKotlin task after five
+#  minutes of Gradle, and skip the emulator job with it. kotlinc cannot resolve
+#  androidx here, so only its parser diagnostics are treated as failures.
+# ---------------------------------------------------------------------------
+echo ">> static check: Kotlin syntax (all sources)"
+bash "$ROOT/tools/validate_syntax.sh"
+echo
 
 OUT="$ROOT/verification/.out/classes"
 rm -rf "$OUT"

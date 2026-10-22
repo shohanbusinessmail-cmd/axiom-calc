@@ -110,7 +110,6 @@ class StandardCalculatorUiTest {
         }
         compose.onNodeWithText("42").assertIsDisplayed()
     }
-    }
 
     @Test fun everyKeypadKeyHasAnAccessibilityDescription() {
         listOf(
