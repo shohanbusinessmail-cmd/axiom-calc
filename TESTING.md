@@ -8,7 +8,7 @@ suite that has not been run is marked NOT TESTED, not "passing".
 
 ## 1. Test inventory
 
-### Local unit tests — `app/src/test/` (183 tests, all executed and passing)
+### Local unit tests — `app/src/test/` (192 tests, all executed and passing)
 
 | Suite | Tests | Covers |
 |-------|-------|--------|
@@ -16,14 +16,15 @@ suite that has not been run is marked NOT TESTED, not "passing".
 | `math/SolversTest.kt` | 56 | Statistics, matrices, complex, linear/simultaneous/quadratic, sequences, integer math, fractions, bases, finance, numeric solvers, dates/durations, percent math |
 | `domain/CalculatorBehaviorTest.kt` | 22 | Keypad editing (backspace = one token, CE, AC), undo/redo, sign toggle, parentheses, memory keys, percentage-key policy, `Ans` retention, token cap |
 | `domain/CatalogCompletenessTest.kt` | 16 | Every category has forms; every form and every Quick Solve tool has a sample input and computes; every form declares inputs, formula text and explanation; garbage input raises a **typed** error for every form; zero denominators and triangle inequality are rejected; every tool shows ≥3 steps including Relationship/Final/Restriction; library links resolve; library search works |
+| `math/PrecisionSqrtTest.kt` | 9 | The decimal square root: exact roots of perfect squares up to 13 digits, irrational roots against 34-digit reference values computed independently in Python's `decimal` module, `r² = n` within `1e-28` relative over 25 samples, convergence at `1e100000` and `1e-100000`, monotonicity, the typed `Domain` error for a negative argument, and both former callers of the platform method (`sqrt()` through the engine, standard deviation through `Statistics`) |
 | `domain/PersistenceSemanticsTest.kt` | 16 | Retention cutoffs against a fixed injectable clock, boundary inclusivity, `fromName`/`fromDays` safety, canonical round-trip, rejection of grouped display text, reuse of a stored value through the engine, matrix `trace`/`toRows`, constant symbol aliases |
 
 Executed output (committed at `verification/reports/unit-tests-latest.txt`):
 
 ```
->> compiling 38 Kotlin sources (core=31 tests=5 shim=2)
+>> compiling 39 Kotlin sources (core=31 tests=6 shim=2)
 >> running tests
-TOTAL 183   PASSED 183   FAILED 0   ERRORS 0   SKIPPED 0
+TOTAL 192   PASSED 192   FAILED 0   ERRORS 0   SKIPPED 0
 RESULT: PASS
 ```
 
@@ -51,7 +52,7 @@ On a machine with the Android SDK, JDK 17 and network access to Google's and
 Maven's repositories:
 
 ```bash
-./gradlew test                          # 183 local unit tests (real JUnit 4)
+./gradlew test                          # 192 local unit tests (real JUnit 4)
 ./gradlew connectedDebugAndroidTest     # 75 instrumented tests (device/emulator)
 ./gradlew lint                          # Android lint
 ./gradlew assembleDebug                 # debug APK

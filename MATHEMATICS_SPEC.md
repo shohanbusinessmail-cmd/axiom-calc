@@ -80,9 +80,34 @@ than explicit `*` and `/`, which is what makes `1/2pi = 1/(2π)` rather than
   (`Double`) and then re-rounded into DECIMAL128 through
   `CalcNumber.fromTranscendental`, which rejects `NaN` and `Infinity` as typed
   errors instead of storing them.
-- `sqrt` and integer nth roots are computed exactly with `BigDecimal.sqrt` /
-  Newton iteration (`bigNthRoot`), with a `1e-30` convergence floor rather than
-  `ulp()`, which is unavailable on the target API levels.
+- **Square root** is Newton–Raphson on `BigDecimal`, in `Precision.sqrt`:
+
+  ```
+  x' = (x + n / x) / 2,  seeded with x₀ = 10^floor(log10(n)/2)
+  ```
+
+  iterated at `DECIMAL128 + 4` guard digits and rounded once to `DECIMAL128`.
+  The seed is derived from the decimal exponent, so the step count does not grow
+  with magnitude — the exponent guard admits values with 100 000 digits, where a
+  naive seed would need tens of thousands of iterations. Convergence stops at a
+  fixed point or a two-cycle, in which case the smaller of the two straddling
+  values is returned so the reported root never squares to more than its
+  argument. A negative argument raises the typed `Domain` error; it never returns
+  `NaN` and never returns a plausible-looking zero.
+
+  This is **not** `java.math.BigDecimal.sqrt`, and the difference is the reason
+  the algorithm is documented. That method was added in **API level 33**; with
+  `minSdk 24` a call to it throws `NoSuchMethodError` on every Android 7.0 to
+  12L device. The first implementation of this app did exactly that, in three
+  places, and all 183 JVM tests passed — the desktop JDK has the method. Android
+  lint reported it as nine `NewApi` errors. Correctness of `sqrt` is verified
+  against 34-digit reference values computed independently in Python's `decimal`
+  module, against `r² = n` to within `1e-28` relative error over 25 samples, at
+  `1e100000` and `1e-100000`, and for monotonicity; see
+  `app/src/test/java/com/shohankhan/axiomcalc/math/PrecisionSqrtTest.kt`.
+- Integer nth roots use Newton iteration (`bigNthRoot`) with a `1e-30`
+  convergence floor rather than `ulp()`, which is unavailable on the target API
+  levels.
 
 Which representation is used where:
 

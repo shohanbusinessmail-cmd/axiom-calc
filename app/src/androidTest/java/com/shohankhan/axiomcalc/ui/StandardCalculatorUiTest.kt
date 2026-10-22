@@ -1,15 +1,14 @@
 package com.shohankhan.axiomcalc.ui
 
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.ExperimentalComposeUiTestApi
+import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.performKeyPress
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shohankhan.axiomcalc.MainActivity
 import org.junit.Rule
@@ -81,29 +80,36 @@ class StandardCalculatorUiTest {
         compose.onNodeWithText("50").assertIsDisplayed()
     }
 
-    // performKeyInput is @ExperimentalComposeUiTestApi in the Compose version
-    // this project pins (BOM 2024.10.01). It is stable on the androidx main
-    // branch, which is what reading the source there suggests - the compiler in
-    // CI is the authority, not the branch, and it required the opt-in.
-    @OptIn(ExperimentalComposeUiTestApi::class)
     @Test fun hardwareKeyboardDigitsReachTheBuffer() {
-        // The keypad requests focus and declares key handling; a physical
-        // keyboard must be able to drive it without any on-screen text field.
-        // pressKey takes a Compose Key directly. performKeyPress does not: it
-        // takes androidx.compose.ui.input.key.KeyEvent, which is a value class
-        // wrapping an android.view.KeyEvent, so KeyEvent(Key.One) does not
-        // compile. performKeyInput also runs the accessibility checks for the
-        // node it injects into.
+        // The keypad requests focus through a FocusRequester and routes events
+        // through onPreviewKeyEvent to CalculatorViewModel.consumeKeyEvent, so a
+        // physical keyboard must drive it with no on-screen text field.
+        //
+        // Only stable APIs are used here, deliberately. performKeyPress takes
+        // androidx.compose.ui.input.key.KeyEvent, which is a value class over an
+        // android.view.KeyEvent, so the platform event is built explicitly.
+        // The two alternatives both depend on which Compose version is being
+        // compiled: performKeyInput { pressKey(Key.One) } is marked experimental
+        // in the pinned BOM, and the opt-in marker is named
+        // ExperimentalComposeUiTestApi in some releases and ExperimentalTestApi
+        // in others. Neither name resolved here, and a test should not fail to
+        // compile over an annotation that exists only to warn about an API this
+        // test does not need.
         val keypad = compose.onNodeWithContentDescription("Calculator keypad")
-        keypad.performKeyInput {
-            pressKey(Key.One)
-            pressKey(Key.Two)
-            pressKey(Key.Plus)
-            pressKey(Key.Three)
-            pressKey(Key.Zero)
-            pressKey(Key.Enter)
+        for (keyCode in listOf(
+            AndroidKeyEvent.KEYCODE_1,
+            AndroidKeyEvent.KEYCODE_2,
+            AndroidKeyEvent.KEYCODE_PLUS,
+            AndroidKeyEvent.KEYCODE_3,
+            AndroidKeyEvent.KEYCODE_0,
+            AndroidKeyEvent.KEYCODE_ENTER,
+        )) {
+            keypad.performKeyPress(
+                KeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, keyCode)),
+            )
         }
         compose.onNodeWithText("42").assertIsDisplayed()
+    }
     }
 
     @Test fun everyKeypadKeyHasAnAccessibilityDescription() {

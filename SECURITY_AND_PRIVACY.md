@@ -32,11 +32,63 @@ transmitted; it is only placed in a `mailto:` URI when the user taps it.
 
 ### 2.1 No permission, therefore no socket
 
-`app/src/main/AndroidManifest.xml` declares **zero** `uses-permission` elements.
 `android.permission.INTERNET` is deliberately absent. Without it the Android
 kernel denies socket creation for the whole process, so no code path in the app —
 including any code path inside a library — can reach the network. This is enforced
 by the platform, not by convention or by a code review.
+
+Declaring nothing in the source manifest is not sufficient on its own, and this
+project found that out from a real build rather than from a design document. The
+manifest that ships is the **merged** one: AndroidX libraries contribute their own
+`uses-permission` elements at merge time. An early CI run built a release APK whose
+source manifest requested nothing and whose merged manifest declared five
+permissions. Auditing only the source file would have reported a clean result for
+an APK that was not clean.
+
+`app/src/main/AndroidManifest.xml` therefore declares **zero** `uses-permission`
+elements and **four** explicit removals:
+
+| removed with `tools:node="remove"` | contributed by | why it is not justified |
+|---|---|---|
+| `WAKE_LOCK` | `androidx.work` | Retention cleanup runs when the device is idle and charging; it has no business holding a wake lock. |
+| `ACCESS_NETWORK_STATE` | `androidx.work` | Reading connectivity state is only useful to something that intends to use the network. Nothing here does. |
+| `RECEIVE_BOOT_COMPLETED` | `androidx.work` | The app must not start itself at boot. Retention is re-scheduled when the app is next opened. |
+| `FOREGROUND_SERVICE` | `androidx.work` | No foreground service exists, so the permission would be an unused capability. |
+
+### 2.1.1 The one permission that survives, and why
+
+After the removals, the merged manifest — debug **and** release — declares exactly
+one permission:
+
+```
+com.shohankhan.axiomcalc.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+```
+
+It is kept deliberately, and the reasoning is recorded here because "requests one
+permission" and "requests no permissions" are different claims:
+
+* It is **self-defined by `androidx.core` inside this same manifest** with
+  `protectionLevel="signature"`. It is not a platform permission and it cannot be
+  granted to any app that is not signed with this app's key, so no third party can
+  ever hold it.
+* It **grants no capability**. It protects a broadcast receiver that is registered
+  as *not exported*; holding it changes nothing about data access, network access
+  or device access.
+* `ContextCompat.registerReceiver` uses it to satisfy the Android 14 requirement
+  that a dynamically registered receiver declare `RECEIVER_EXPORTED` or
+  `RECEIVER_NOT_EXPORTED`. WorkManager registers its force-stop receiver that way.
+* Removing it too was considered and rejected: it would risk a `SecurityException`
+  on API 34+ inside a library this project does not control, and that failure path
+  cannot be exercised in the authoring environment. Removing a capability the app
+  does not have, at the cost of a crash it might, is not a privacy improvement.
+
+The CI job does not take this on trust. `Merged manifest permission audit` parses
+every merged manifest the build produces with an XML parser and **fails the build**
+if any `uses-permission` element is not on a one-entry allowlist, and separately if
+any of fifteen named permissions — `INTERNET`, `ACCESS_NETWORK_STATE`,
+`ACCESS_FINE_LOCATION`, `READ_CONTACTS`, `CAMERA`, `RECORD_AUDIO` and the rest —
+appears at all. That step passed on a real release build; see §2.5 for the exact
+command and evidence reference.
 
 ### 2.2 No network code
 
@@ -69,9 +121,11 @@ reported in-app instead of crashing.
 # 1. Source manifest: must print nothing
 grep -n "uses-permission" app/src/main/AndroidManifest.xml
 
-# 2. Merged release manifest: must print nothing
-grep -n "uses-permission" app/build/outputs/logs/manifest-merger-release-report.txt
-aapt2 dump permissions app/build/outputs/apk/release/app-release.apk
+# 2. Merged release manifest: must print exactly one line, and it must be the
+#    self-defined signature permission from 2.1.1. Anything else is a regression.
+grep -n "uses-permission" \
+  app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
+aapt2 dump permissions app/build/outputs/apk/release/app-release-unsigned.apk
 
 # 3. Dependency graph: no networking/analytics coordinates
 ./gradlew app:dependencies --configuration releaseRuntimeClasspath

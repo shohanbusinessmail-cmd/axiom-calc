@@ -15,7 +15,7 @@ RESULT: PASS - all resources well-formed, all vector path data valid,
 Axiom Calc - Kotlin import validation
 ========================================================================
 Kotlin files scanned ...... 77
-Imported names indexed .... 341
+Imported names indexed .... 340
 Top-level declarations .... 1680
 Member names suppressed ... 158
 ------------------------------------------------------------------------
