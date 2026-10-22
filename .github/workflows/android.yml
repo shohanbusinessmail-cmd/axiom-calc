@@ -569,7 +569,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Compile the instrumented APK BEFORE paying for an emulator. These
+      # sources had never been compiled by anything: the local harness cannot
+      # resolve androidx.test, and the main sources turned out to have 96 errors
+      # the first time a real compiler saw them. If they do not compile, an
+      # emulator boot is 20 wasted minutes and the result is still tests=0 with
+      # no explanation - which is exactly what the previous run produced.
+      - name: Compile the instrumented test APK
+        id: assemble-android-test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebugAndroidTest --stacktrace 2>&1 | tee /tmp/android-test-compile.log
+          STATUS=$?
+          if ls app/build/outputs/apk/androidTest/debug/*.apk >/dev/null 2>&1; then
+            echo "apk=true" >> "$GITHUB_OUTPUT"
+            ls -l app/build/outputs/apk/androidTest/debug/
+          else
+            echo "apk=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit $STATUS
+
       - name: Enable KVM for hardware acceleration
+        if: steps.assemble-android-test.outputs.apk == 'true'
         run: |
           set -euo pipefail
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -579,6 +601,7 @@ jobs:
           ls -l /dev/kvm
 
       - name: Run instrumented tests (75)
+        if: steps.assemble-android-test.outputs.apk == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -588,7 +611,7 @@ jobs:
           disk-size: 8G
           heap-size: 1024M
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
+          script: ./gradlew connectedDebugAndroidTest --stacktrace 2>&1 | tee /tmp/connected.log
 
       - name: Post instrumented results to the pull request
         if: always()
@@ -600,6 +623,20 @@ jobs:
           PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number' || true)"
           {
             echo "### Instrumented test results — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            echo
+            echo "androidTest APK built: `${{ steps.assemble-android-test.outputs.apk }}`"
+            echo "compile step outcome: `${{ steps.assemble-android-test.outcome }}`"
+            echo
+            if [ "${{ steps.assemble-android-test.outputs.apk }}" != "true" ]; then
+              echo '**The instrumented APK did not build, so no emulator was started'
+              echo 'and no test could run. `tests=0` below means NOT TESTED, not passed.**'
+              echo
+              echo '#### Compile errors'
+              echo '```'
+              ERRORS="$( { grep -E '^e: |error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED' /tmp/android-test-compile.log || true; } | sort -u | head -150)"
+              if [ -n "$ERRORS" ]; then printf '%s\n' "$ERRORS"; else tail -60 /tmp/android-test-compile.log 2>/dev/null || echo 'no log'; fi
+              echo '```'
+            fi
             echo '```'
             python3 - <<'PY'
           import glob, xml.etree.ElementTree as ET
@@ -619,7 +656,20 @@ jobs:
           print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
           for d in details[:60]:
               print("FAILED " + d)
+          if not tests:
+              print()
+              print("No instrumented test result XML exists. This is NOT TESTED,")
+              print("not a pass. The reason is in the log tail below.")
           PY
+            if [ -f /tmp/connected.log ]; then
+              echo
+              echo '<details><summary>connectedDebugAndroidTest log (tail)</summary>'
+              echo
+              echo '```'
+              tail -80 /tmp/connected.log
+              echo '```'
+              echo '</details>'
+            fi
             echo '```'
           } > /tmp/instr-comment.md
           if [ -n "$PR" ]; then
@@ -627,6 +677,26 @@ jobs:
           else
             cat /tmp/instr-comment.md >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # Without this the job could report success while zero tests ran: the
+      # compile step is continue-on-error and the emulator step is conditional,
+      # so a job where nothing executed would otherwise finish green. A run with
+      # no instrumented evidence is a failure, never a pass.
+      - name: Fail if no instrumented test actually ran
+        if: always()
+        run: |
+          set -uo pipefail
+          APK="${{ steps.assemble-android-test.outputs.apk }}"
+          XML_COUNT="$(find app/build/outputs/androidTest-results -name '*.xml' 2>/dev/null | wc -l)"
+          if [ "$APK" != "true" ]; then
+            echo "FAIL: the instrumented APK did not build, so no test ran."
+            exit 1
+          fi
+          if [ "$XML_COUNT" -eq 0 ]; then
+            echo "FAIL: the instrumented APK built but produced no result XML, so no test ran."
+            exit 1
+          fi
+          echo "Instrumented result files parsed: $XML_COUNT"
 
       - name: Upload instrumented reports
         if: always()
