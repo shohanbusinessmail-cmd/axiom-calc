@@ -11,7 +11,7 @@ import com.shohankhan.axiomcalc.domain.model.AppSettings
 import com.shohankhan.axiomcalc.domain.model.RetentionPolicy
 import com.shohankhan.axiomcalc.domain.model.ThemeMode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -39,9 +39,18 @@ class SettingsRepositoryTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         repository = DataStoreSettingsRepository(context)
+        // The preferencesDataStore delegate is a per-process singleton over one
+        // file, so every test in this class shares state. Clearing all keys
+        // rather than writing defaults matters: it makes each test start from an
+        // EMPTY store, which is the fresh-install path, so a read has to derive
+        // every value from the documented default instead of finding one that a
+        // previous test left behind. JUnit4 orders methods by a hash of their
+        // names, not by source order, so without this the defaults test reads
+        // whatever ran before it.
+        runBlocking { context.settingsDataStore.edit { it.clear() } }
     }
 
-    @Test fun defaultsMatchTheSpecification() = runTest {
+    @Test fun defaultsMatchTheSpecification() = runBlocking {
         val settings = repository.current()
         assertEquals(ThemeMode.SYSTEM, settings.theme)
         assertTrue(settings.hapticsEnabled)
@@ -53,7 +62,7 @@ class SettingsRepositoryTest {
         assertEquals(RetentionPolicy.THIRTY_DAYS, settings.retention)
     }
 
-    @Test fun writtenValuesSurviveANewRepositoryInstance() = runTest {
+    @Test fun writtenValuesSurviveANewRepositoryInstance() = runBlocking {
         repository.update {
             it.copy(
                 theme = ThemeMode.DARK,
@@ -79,7 +88,7 @@ class SettingsRepositoryTest {
         assertEquals(RetentionPolicy.NEVER, reloaded.retention)
     }
 
-    @Test fun updatesArePartialAndKeepOtherValues() = runTest {
+    @Test fun updatesArePartialAndKeepOtherValues() = runBlocking {
         repository.update { it.copy(theme = ThemeMode.LIGHT) }
         repository.update { it.copy(decimalPlaces = 3) }
 
@@ -91,7 +100,7 @@ class SettingsRepositoryTest {
         assertTrue(settings.grouping)
     }
 
-    @Test fun decimalPlacesAreClampedToTheDocumentedRange() = runTest {
+    @Test fun decimalPlacesAreClampedToTheDocumentedRange() = runBlocking {
         repository.update { it.copy(decimalPlaces = 99) }
         assertEquals(16, repository.current().decimalPlaces)
 
@@ -99,7 +108,7 @@ class SettingsRepositoryTest {
         assertEquals(0, repository.current().decimalPlaces)
     }
 
-    @Test fun unknownEnumValuesFallBackToDefaults() = runTest {
+    @Test fun unknownEnumValuesFallBackToDefaults() = runBlocking {
         // Simulates a value written by a future or corrupt build, through the
         // same DataStore instance the repository uses.
         context.settingsDataStore.edit { prefs ->
@@ -116,7 +125,7 @@ class SettingsRepositoryTest {
         assertEquals(RetentionPolicy.THIRTY_DAYS, recovered.retention)
     }
 
-    @Test fun theFlowEmitsOnEveryChange() = runTest {
+    @Test fun theFlowEmitsOnEveryChange() = runBlocking {
         val emissions = mutableListOf<ThemeMode>()
         backgroundScope.launch {
             repository.settings.collect { emissions += it.theme }
@@ -133,7 +142,7 @@ class SettingsRepositoryTest {
         assertEquals(ThemeMode.LIGHT, repository.settings.first().theme)
     }
 
-    @Test fun noSettingStoresFormattedDisplayText() = runTest {
+    @Test fun noSettingStoresFormattedDisplayText() = runBlocking {
         // Guards the rule that display strings never enter persistence: only
         // names, booleans and integers are written.
         repository.update { it.copy(notationName = "SCIENTIFIC", decimalPlaces = 12) }

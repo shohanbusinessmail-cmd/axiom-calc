@@ -11,7 +11,7 @@ import com.shohankhan.axiomcalc.domain.model.HistoryEntry
 import com.shohankhan.axiomcalc.domain.model.RetentionPolicy
 import com.shohankhan.axiomcalc.infra.di.RetentionWorker
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import androidx.work.ListenableWorker
@@ -46,7 +46,7 @@ class RetentionWorkerTest {
         )
     }
 
-    @Test fun workerDeletesExpiredRowsAndReportsTheCount() = runTest {
+    @Test fun workerDeletesExpiredRowsAndReportsTheCount() = runBlocking {
         val container = application.container
         container.settings.update { it.copy(retention = RetentionPolicy.SEVEN_DAYS) }
         container.historyRepository.add(
@@ -69,7 +69,7 @@ class RetentionWorkerTest {
         )
     }
 
-    @Test fun workerWithNeverRetentionDeletesNothing() = runTest {
+    @Test fun workerWithNeverRetentionDeletesNothing() = runBlocking {
         val container = application.container
         container.settings.update { it.copy(retention = RetentionPolicy.NEVER) }
         container.historyRepository.add(
@@ -96,7 +96,7 @@ class RetentionWorkerTest {
         assertTrue(scheduled || !scheduled)
     }
 
-    @Test fun startupRetentionPassRunsAgainstTheRealDatabase() = runTest {
+    @Test fun startupRetentionPassRunsAgainstTheRealDatabase() = runBlocking {
         val container = application.container
         container.settings.update { it.copy(retention = RetentionPolicy.ONE_DAY) }
         container.historyRepository.add(

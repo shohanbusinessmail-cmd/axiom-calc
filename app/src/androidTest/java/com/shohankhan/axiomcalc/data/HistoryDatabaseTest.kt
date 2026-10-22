@@ -15,7 +15,7 @@ import com.shohankhan.axiomcalc.domain.model.HistoryEntry
 import com.shohankhan.axiomcalc.domain.model.RetentionPolicy
 import com.shohankhan.axiomcalc.domain.model.SavedCalculation
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,7 +71,7 @@ class HistoryDatabaseTest {
         timestamp: Long = now,
     ) = HistoryEntry(id, expression, value, display, origin, timestamp)
 
-    @Test fun insertedRowsAreObservedNewestFirst() = runTest {
+    @Test fun insertedRowsAreObservedNewestFirst() = runBlocking {
         history.add(entry(expression = "1+1", value = "2", timestamp = now - 2 * day))
         history.add(entry(expression = "2+2", value = "4", timestamp = now - 1 * day))
         history.add(entry(expression = "3+3", value = "6", timestamp = now))
@@ -82,7 +82,7 @@ class HistoryDatabaseTest {
         assertEquals("1+1", rows[2].expression)
     }
 
-    @Test fun normalizedValueIsStoredSeparatelyFromDisplayText() = runTest {
+    @Test fun normalizedValueIsStoredSeparatelyFromDisplayText() = runBlocking {
         val id = history.add(entry(value = "1234567", display = "1,234,567"))
         val row = history.observeAll().first().first { it.id == id }
         assertEquals("1234567", row.resultValue)
@@ -92,7 +92,7 @@ class HistoryDatabaseTest {
             .fromCanonical(row.resultValue)!!.toDouble().toInt())
     }
 
-    @Test fun searchMatchesExpressionAndResult() = runTest {
+    @Test fun searchMatchesExpressionAndResult() = runBlocking {
         history.add(entry(expression = "200*15%", value = "30"))
         history.add(entry(expression = "sin(30)", value = "0.5"))
 
@@ -101,7 +101,7 @@ class HistoryDatabaseTest {
         assertEquals(0, history.observeSearch("zzz").first().size)
     }
 
-    @Test fun multiDeleteRemovesExactlyTheSelectedRows() = runTest {
+    @Test fun multiDeleteRemovesExactlyTheSelectedRows() = runBlocking {
         val a = history.add(entry(expression = "a"))
         val b = history.add(entry(expression = "b"))
         val c = history.add(entry(expression = "c"))
@@ -112,7 +112,7 @@ class HistoryDatabaseTest {
         assertEquals(b, remaining[0].id)
     }
 
-    @Test fun deleteAllClearsHistoryButNotSavedCalculations() = runTest {
+    @Test fun deleteAllClearsHistoryButNotSavedCalculations() = runBlocking {
         history.add(entry(expression = "1+1"))
         saved.add(SavedCalculation(0, "My formula", "2+2", "4", "4", CalcOrigin.STANDARD, now))
 
@@ -122,7 +122,7 @@ class HistoryDatabaseTest {
         assertEquals(1, saved.observeAll().first().size)
     }
 
-    @Test fun retentionDeletesOnlyExpiredRows() = runTest {
+    @Test fun retentionDeletesOnlyExpiredRows() = runBlocking {
         history.add(entry(expression = "old", timestamp = now - 40 * day))
         history.add(entry(expression = "recent", timestamp = now - 2 * day))
 
@@ -134,14 +134,14 @@ class HistoryDatabaseTest {
         assertEquals("recent", remaining[0].expression)
     }
 
-    @Test fun neverRetentionDeletesNothing() = runTest {
+    @Test fun neverRetentionDeletesNothing() = runBlocking {
         history.add(entry(expression = "ancient", timestamp = now - 5000 * day))
         val deleted = history.deleteExpired(now, RetentionPolicy.NEVER)
         assertEquals(0, deleted)
         assertEquals(1, history.observeAll().first().size)
     }
 
-    @Test fun expiredRowsAreFilteredFromReadsEvenBeforeCleanup() = runTest {
+    @Test fun expiredRowsAreFilteredFromReadsEvenBeforeCleanup() = runBlocking {
         // The read path filters by cutoff, so an uncleaned database still cannot
         // show an expired entry to the user.
         settings.update { it.copy(retention = RetentionPolicy.ONE_DAY) }
@@ -153,7 +153,7 @@ class HistoryDatabaseTest {
         assertTrue("fresh row was hidden", "fresh" in visible)
     }
 
-    @Test fun originIsPersistedForFiltering() = runTest {
+    @Test fun originIsPersistedForFiltering() = runBlocking {
         history.add(entry(expression = "std", origin = CalcOrigin.STANDARD))
         history.add(entry(expression = "sci", origin = CalcOrigin.SCIENTIFIC))
         history.add(entry(expression = "lab", origin = CalcOrigin.MATH_LAB))
@@ -166,7 +166,7 @@ class HistoryDatabaseTest {
         )
     }
 
-    @Test fun savedCalculationsSurviveRetentionRuns() = runTest {
+    @Test fun savedCalculationsSurviveRetentionRuns() = runBlocking {
         saved.add(SavedCalculation(0, "Kept", "1+1", "2", "2", CalcOrigin.STANDARD, now - 400 * day))
         history.add(entry(expression = "old", timestamp = now - 400 * day))
 
@@ -176,7 +176,7 @@ class HistoryDatabaseTest {
         assertEquals(0, history.observeAll().first().size)
     }
 
-    @Test fun favoritesAndRecentsAreIndependentStores() = runTest {
+    @Test fun favoritesAndRecentsAreIndependentStores() = runBlocking {
         favorites.setFavorite("lib_pythagoras", true)
         favorites.recordAccess("lib_quadratic")
         favorites.recordAccess("lib_mean")
@@ -193,21 +193,21 @@ class HistoryDatabaseTest {
         assertEquals(2, favorites.observeRecentIds().first().size)
     }
 
-    @Test fun recentsAreCappedAtTwentyEntries() = runTest {
+    @Test fun recentsAreCappedAtTwentyEntries() = runBlocking {
         repeat(25) { index -> favorites.recordAccess("formula_$index") }
         val recents = favorites.observeRecentIds().first()
         assertEquals(20, recents.size)
         assertEquals("formula_24", recents[0])
     }
 
-    @Test fun countReportsStoredRows() = runTest {
+    @Test fun countReportsStoredRows() = runBlocking {
         assertEquals(0, history.count())
         history.add(entry(expression = "a"))
         history.add(entry(expression = "b"))
         assertEquals(2, history.count())
     }
 
-    @Test fun entityRoundTripKeepsEveryField() = runTest {
+    @Test fun entityRoundTripKeepsEveryField() = runBlocking {
         val direct = HistoryEntity(
             expression = "sqrt(16)",
             resultValue = "4",
@@ -222,7 +222,7 @@ class HistoryDatabaseTest {
         assertEquals(direct.timestampMillis, read.timestampMillis)
     }
 
-    @Test fun savedCalculationEntityRoundTrip() = runTest {
+    @Test fun savedCalculationEntityRoundTrip() = runBlocking {
         val entity = SavedCalculationEntity(
             name = "VAT check",
             expression = "1000*1.15",

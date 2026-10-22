@@ -170,9 +170,14 @@ fun AxiomApp(
                                 },
                                 label = { Text(label) },
                                 alwaysShowLabel = false,
+                                // NavigationBarItem is selectable, so the
+                                // framework already exposes the selected state to
+                                // accessibility services. Spelling it into the
+                                // label as well duplicated it for TalkBack and
+                                // made the description differ between the selected
+                                // and unselected tabs for no reason.
                                 modifier = Modifier.semantics {
-                                    contentDescription = "Tab $label" +
-                                        if (selected) ", selected" else ""
+                                    contentDescription = "Tab $label"
                                 },
                             )
                         }

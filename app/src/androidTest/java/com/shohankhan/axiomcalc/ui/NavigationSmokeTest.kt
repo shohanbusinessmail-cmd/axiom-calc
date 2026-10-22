@@ -58,12 +58,16 @@ class NavigationSmokeTest {
 
     @Test fun scientificTabOpensTheScientificCalculator() {
         compose.onNodeWithContentDescription("Tab Scientific").performClick()
-        compose.onNodeWithText("DEG").assertIsDisplayed()
+        // Not onNodeWithText("DEG"): the mode chip and the expanded panel's own
+        // DEG key both render that text, so two nodes match and the assertion is
+        // ambiguous. The chip is identified by its accessibility description.
+        compose.onNodeWithContentDescription("Switch angle mode, currently DEG")
+            .assertIsDisplayed()
     }
 
     @Test fun scientificTabCanSwitchToRadians() {
         compose.onNodeWithContentDescription("Tab Scientific").performClick()
-        compose.onNodeWithContentDescription("Angle mode, currently degrees").performClick()
+        compose.onNodeWithContentDescription("Switch angle mode, currently DEG").performClick()
         compose.onNodeWithText("RAD").assertIsDisplayed()
     }
 

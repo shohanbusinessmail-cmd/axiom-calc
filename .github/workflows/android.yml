@@ -660,17 +660,31 @@ jobs:
                               # frames so what is left is the actual cause.
                               head = [l.strip() for l in body.split("\n")
                                       if l.strip() and not l.strip().startswith("at ")]
-                              cause = " | ".join(head[:3])[:420]
+                              # A diagnostic test puts a layout dump in its
+                              # failure message, which is the only way to get
+                              # device state out of a runner whose logs and
+                              # artifacts are unreachable from here. Those get a
+                              # much larger budget than an ordinary assertion.
+                              is_diag = str(tc.get("name", "")).startswith("diagnostic")
+                              limit = 12000 if is_diag else 420
+                              cause = " | ".join(head[:3])[:limit]
                               msg = node.get("message") or ""
                               details.append(f'{tc.get("classname")}.{tc.get("name")}:\n'
                                              f'    type: {node.get("type", "?")}\n'
                                              f'    {msg}\n    {cause}')
           print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
-          for d in details[:45]:
+          # Diagnostics first: they carry the device state everything else is
+          # interpreted against. Then ordinary failures, then names only, so the
+          # comment stays inside GitHub's size limit.
+          diags = [d for d in details if ":\n    type" in d and "DIAGNOSTIC" in d]
+          rest = [d for d in details if d not in diags]
+          for d in diags[:2]:
+              print("DIAGNOSTIC " + d)
+          for d in rest[:22]:
               print("FAILED " + d)
-          if len(details) > 45:
-              print(f"... and {len(details) - 45} more failures, listed by name only:")
-              for d in details[45:]:
+          if len(rest) > 22:
+              print(f"... and {len(rest) - 22} more failures, listed by name only:")
+              for d in rest[22:]:
                   print("FAILED " + d.split(":")[0])
           if not tests:
               print()

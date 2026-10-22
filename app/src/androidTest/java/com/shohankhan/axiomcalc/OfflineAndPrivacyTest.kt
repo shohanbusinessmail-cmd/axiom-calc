@@ -30,13 +30,36 @@ class OfflineAndPrivacyTest {
             PackageManager.GET_PROVIDERS,
     )
 
-    @Test fun noPermissionsAreRequestedAtAll() {
+    @Test fun onlyTheSelfDefinedSignaturePermissionIsRequested() {
+        // This assertion used to demand an empty list, and it was wrong rather
+        // than strict. The source manifest requests nothing, but androidx.core
+        // merges in a permission it defines itself in the same manifest, so the
+        // installed package requests exactly one. Asserting an empty list here
+        // would fail forever and teach whoever reads it to ignore the suite.
         val requested = packageInfo.requestedPermissions?.toList() ?: emptyList()
-        assertEquals(
-            "the app must request no permissions; found $requested",
-            emptyList<String>(),
-            requested,
+        val allowed = setOf(
+            "com.shohankhan.axiomcalc.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
         )
+        val unexpected = requested.filterNot { it in allowed }
+        assertEquals(
+            "only the self-defined signature permission may be requested; " +
+                "unexpected entries: $unexpected (all requested: $requested)",
+            emptyList<String>(),
+            unexpected,
+        )
+        // The offline guarantee, stated positively: nothing that would allow a
+        // socket, a radio, a sensor or another app's data may appear at all.
+        for (forbidden in listOf(
+            "android.permission.INTERNET",
+            "android.permission.ACCESS_NETWORK_STATE",
+            "android.permission.CHANGE_NETWORK_STATE",
+            "android.permission.ACCESS_WIFI_STATE",
+            "android.permission.WAKE_LOCK",
+            "android.permission.RECEIVE_BOOT_COMPLETED",
+            "android.permission.FOREGROUND_SERVICE",
+        )) {
+            assertFalse("$forbidden must not be requested", requested.contains(forbidden))
+        }
     }
 
     @Test fun internetPermissionIsAbsent() {
@@ -57,7 +80,17 @@ class OfflineAndPrivacyTest {
             ?.filter { (_, flags) -> flags and PackageManager.PERMISSION_GRANTED != 0 }
             ?.map { it.first }
             ?: emptyList()
-        assertEquals("no permission should be granted; found $granted", emptyList<String>(), granted)
+        // The self-defined signature permission is granted to this package,
+        // because it is signed with the same key that defines it. It confers no
+        // capability: it only guards a receiver registered as not exported.
+        val unexpectedGrants = granted.filterNot {
+            it == "com.shohankhan.axiomcalc.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        }
+        assertEquals(
+            "no capability-bearing permission may be granted; found $unexpectedGrants",
+            emptyList<String>(),
+            unexpectedGrants,
+        )
     }
 
     @Test fun noTrackingAnalyticsOrAdvertisingComponentsAreMerged() {
@@ -93,7 +126,27 @@ class OfflineAndPrivacyTest {
     @Test fun onlyExpectedComponentsAreDeclared() {
         val activities = packageInfo.activities?.map { it.name } ?: emptyList()
         assertTrue("MainActivity must be declared", activities.any { it.endsWith("MainActivity") })
-        assertEquals("exactly one activity is expected", 1, activities.size)
+        // The installed DEBUG package contains three activities, not one: the
+        // `androidx.compose.ui:ui-test-manifest` dependency, declared
+        // debugImplementation only, merges in host activities that the Compose
+        // test rules drive. They are not in a release build. What is asserted
+        // here is the claim that actually matters: the app itself declares one
+        // activity, and only that one is exported or reachable from a launcher.
+        val own = activities.filter { it.startsWith("com.shohankhan.axiomcalc.") }
+        assertEquals("the app must declare exactly one activity; found $own", 1, own.size)
+        val foreign = activities.filterNot { it.startsWith("com.shohankhan.axiomcalc.") }
+        assertTrue(
+            "activities from outside the app must come from the test libraries " +
+                "only; found $foreign",
+            foreign.all { it.startsWith("androidx.") },
+        )
+        val exported = packageInfo.activities?.filter { it.exported }?.map { it.name }
+            ?: emptyList()
+        assertEquals("exactly one exported activity; found $exported", 1, exported.size)
+        assertTrue(
+            "the exported activity must be MainActivity; found $exported",
+            exported.single().endsWith("MainActivity"),
+        )
 
         val services = packageInfo.services?.map { it.name } ?: emptyList()
         // WorkManager's SystemJobService/SystemForegroundService are the only

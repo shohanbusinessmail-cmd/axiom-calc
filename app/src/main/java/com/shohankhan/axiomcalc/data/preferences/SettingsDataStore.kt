@@ -14,6 +14,7 @@ import com.shohankhan.axiomcalc.domain.model.AppSettings
 import com.shohankhan.axiomcalc.domain.model.RetentionPolicy
 import com.shohankhan.axiomcalc.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -40,12 +41,23 @@ class DataStoreSettingsRepository(context: Context) : SettingsRepository {
     private val store: DataStore<Preferences> = context.settingsDataStore
 
     override val settings: Flow<AppSettings> = store.data
-        .catch { emit(emptyPreferences()) }
+        .catch { e ->
+            // Cancellation is control flow, not a corrupt store. Swallowing it
+            // would turn a cancelled read into a silent set of defaults and
+            // break structured concurrency for whoever cancelled.
+            if (e is CancellationException) throw e
+            emit(emptyPreferences())
+        }
         .map { it.toSettings() }
 
     override suspend fun current(): AppSettings = try {
         store.data.map { it.toSettings() }.first()
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
+        // A genuinely unreadable or corrupt store degrades to the documented
+        // defaults rather than blocking the calculator. This is the only
+        // failure that may be absorbed, and it is why the branch above exists.
         AppSettings()
     }
 
