@@ -8,7 +8,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyDown
+import androidx.compose.ui.test.performKeyPress
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shohankhan.axiomcalc.MainActivity
 import org.junit.Rule
@@ -84,12 +84,12 @@ class StandardCalculatorUiTest {
         // The keypad requests focus and declares key handling; a physical
         // keyboard must be able to drive it without any on-screen text field.
         val keypad = compose.onNodeWithContentDescription("Calculator keypad")
-        keypad.performKeyDown(KeyEvent(Key.One))
-        keypad.performKeyDown(KeyEvent(Key.Two))
-        keypad.performKeyDown(KeyEvent(Key.Plus))
-        keypad.performKeyDown(KeyEvent(Key.Three))
-        keypad.performKeyDown(KeyEvent(Key.Zero))
-        keypad.performKeyDown(KeyEvent(Key.Enter))
+        keypad.performKeyPress(KeyEvent(Key.One))
+        keypad.performKeyPress(KeyEvent(Key.Two))
+        keypad.performKeyPress(KeyEvent(Key.Plus))
+        keypad.performKeyPress(KeyEvent(Key.Three))
+        keypad.performKeyPress(KeyEvent(Key.Zero))
+        keypad.performKeyPress(KeyEvent(Key.Enter))
         compose.onNodeWithText("42").assertIsDisplayed()
     }
 
