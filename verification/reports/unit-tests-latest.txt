@@ -15,8 +15,8 @@ RESULT: PASS - all resources well-formed, all vector path data valid,
 Axiom Calc - Kotlin import validation
 ========================================================================
 Kotlin files scanned ...... 78
-Imported names indexed .... 341
-Top-level declarations .... 1692
+Imported names indexed .... 342
+Top-level declarations .... 1693
 Member names suppressed ... 158
 ------------------------------------------------------------------------
 No missing or ambiguous imports detected.
@@ -40,7 +40,7 @@ RESULT: PASS
 Axiom Calc - Kotlin syntax validation
 ========================================================================
 Kotlin sources parsed ..... 80
-Total kotlinc diagnostics . 4104 (unresolved Android types expected)
+Total kotlinc diagnostics . 4105 (unresolved Android types expected)
 Syntax errors ............. 0
 ------------------------------------------------------------------------
 RESULT: PASS - every Kotlin source parses. Semantic correctness against

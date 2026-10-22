@@ -127,7 +127,12 @@ class SettingsRepositoryTest {
 
     @Test fun theFlowEmitsOnEveryChange() = runBlocking {
         val emissions = mutableListOf<ThemeMode>()
-        backgroundScope.launch {
+        // backgroundScope belongs to TestScope and does not exist under
+        // runBlocking. A plain child job works here because runBlocking drives a
+        // single-threaded event loop, so the collector runs concurrently with the
+        // test body and the list needs no synchronisation - but it must be
+        // cancelled, or runBlocking waits for it forever.
+        val collector = launch {
             repository.settings.collect { emissions += it.theme }
         }
         repository.update { it.copy(theme = ThemeMode.DARK) }
@@ -138,6 +143,7 @@ class SettingsRepositoryTest {
                 kotlinx.coroutines.delay(50)
             }
         }
+        collector.cancel()
         assertTrue("expected the DARK write to be emitted", ThemeMode.DARK in emissions)
         assertEquals(ThemeMode.LIGHT, repository.settings.first().theme)
     }

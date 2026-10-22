@@ -1,6 +1,7 @@
 package com.shohankhan.axiomcalc.ui
 
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shohankhan.axiomcalc.MainActivity
@@ -41,7 +42,7 @@ class LayoutDiagnosticsTest {
         val metrics = activity.resources.displayMetrics
         val configuration = activity.resources.configuration
 
-        val nodes = compose.onAllNodes(SemanticsMatcher { true }, useUnmergedTree = true)
+        val nodes = compose.onAllNodes(SemanticsMatcher("any node") { true }, useUnmergedTree = true)
             .fetchSemanticsNodes()
 
         val dump = StringBuilder()
