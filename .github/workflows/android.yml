@@ -580,8 +580,13 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          ./gradlew assembleDebugAndroidTest --stacktrace 2>&1 | tee /tmp/android-test-compile.log
-          STATUS=$?
+          # `|| STATUS=$?` rather than a bare pipeline: GitHub runs every bash
+          # step with -e, so a failing Gradle aborted the script before it could
+          # record the output below, and the report then printed an empty value
+          # for exactly the runs that most needed it.
+          STATUS=0
+          ./gradlew assembleDebugAndroidTest --stacktrace 2>&1 \
+            | tee /tmp/android-test-compile.log || STATUS=$?
           if ls app/build/outputs/apk/androidTest/debug/*.apk >/dev/null 2>&1; then
             echo "apk=true" >> "$GITHUB_OUTPUT"
             ls -l app/build/outputs/apk/androidTest/debug/
@@ -626,8 +631,11 @@ jobs:
           {
             echo "### Instrumented test results — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
             echo
-            echo "androidTest APK built: `${{ steps.assemble-android-test.outputs.apk }}`"
-            echo "compile step outcome: `${{ steps.assemble-android-test.outcome }}`"
+            # The backticks are escaped: inside a double-quoted shell string an
+            # unescaped pair is command substitution, so the interpolated values
+            # were being executed as commands and printed as empty strings.
+            echo "androidTest APK built: \`${{ steps.assemble-android-test.outputs.apk }}\`"
+            echo "compile step outcome: \`${{ steps.assemble-android-test.outcome }}\`"
             echo
             if [ "${{ steps.assemble-android-test.outputs.apk }}" != "true" ]; then
               echo '**The instrumented APK did not build, so no emulator was started'

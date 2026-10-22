@@ -64,7 +64,7 @@ class LayoutDiagnosticsTest {
             val bounds = runCatching { node.boundsInRoot.toString() }
                 .getOrElse { "UNLAID(${it.javaClass.simpleName})" }
             dump.append('[').append(node.id).append(']')
-                .append(" displayed=").append(node.isDisplayed)
+                .append(" displayed=").append(node.isDisplayed())
                 .append(" bounds=").append(bounds)
                 .append(" cfg=").append(node.config.toString().replace('\n', ' '))
                 .append(" | ")
