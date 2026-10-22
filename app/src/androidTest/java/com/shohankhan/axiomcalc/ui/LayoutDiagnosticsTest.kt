@@ -1,7 +1,6 @@
 package com.shohankhan.axiomcalc.ui
 
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shohankhan.axiomcalc.MainActivity
@@ -60,11 +59,15 @@ class LayoutDiagnosticsTest {
         // The unmerged tree, in order. Bounds are read defensively: a node that
         // was never laid out throws, and that fact is itself the interesting
         // part of the answer.
+        // Deliberately no isDisplayed(): it is not available on SemanticsNode in
+        // the pinned Compose version, and the raw bounds answer the question
+        // better than a boolean would. A key that is clipped, off-screen or
+        // measured to zero shows up directly in the numbers, against the window
+        // height printed above.
         nodes.take(120).forEach { node ->
             val bounds = runCatching { node.boundsInRoot.toString() }
-                .getOrElse { "UNLAID(${it.javaClass.simpleName})" }
+                .getOrElse { "UNPLACED(${it.javaClass.simpleName})" }
             dump.append('[').append(node.id).append(']')
-                .append(" displayed=").append(node.isDisplayed())
                 .append(" bounds=").append(bounds)
                 .append(" cfg=").append(node.config.toString().replace('\n', ' '))
                 .append(" | ")
