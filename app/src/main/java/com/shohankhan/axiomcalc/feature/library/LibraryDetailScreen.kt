@@ -91,14 +91,14 @@ fun LibraryDetailScreen(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+            val favoriteLabel = stringResource(
+                if (favorite) R.string.action_favorite_remove else R.string.action_favorite_add,
+            )
             IconButton(
                 onClick = { viewModel.toggleFavorite(formula.id, favorite) },
                 modifier = Modifier
                     .size(AxiomDimens.MinTouchTarget)
-                    .semantics {
-                        contentDescription =
-                            if (favorite) "Remove from favorites" else "Add to favorites"
-                    },
+                    .semantics { contentDescription = favoriteLabel },
             ) {
                 Icon(
                     painter = painterResource(if (favorite) R.drawable.ic_star else R.drawable.ic_star_border),

@@ -173,6 +173,17 @@ private fun ScientificModeRow(
     onToggleExpanded: () -> Unit,
     onOpenComplexLab: () -> Unit,
 ) {
+    // Resolved in composition, not inside the semantics{} lambda below.
+    val angleLabel = stringResource(
+        R.string.angle_mode_switch,
+        stringResource(
+            if (angleMode == AngleMode.DEGREES) {
+                R.string.angle_mode_degrees
+            } else {
+                R.string.angle_mode_radians
+            },
+        ),
+    )
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -190,10 +201,7 @@ private fun ScientificModeRow(
                     },
                 )
             },
-            modifier = Modifier.semantics {
-                contentDescription = "Angle mode, currently " +
-                    if (angleMode == AngleMode.DEGREES) "degrees" else "radians"
-            },
+            modifier = Modifier.semantics { contentDescription = angleLabel },
         )
         FilterChip(
             selected = expanded,

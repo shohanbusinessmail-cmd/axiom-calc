@@ -2,9 +2,9 @@
 ========================================================================
 Axiom Calc - resource validation
 ========================================================================
-XML files parsed .......... 42
-Vector drawables .......... 28
-Vector paths validated .... 42
+XML files parsed .......... 36
+Vector drawables .......... 22
+Vector paths validated .... 36
 Resource kinds indexed .... ['drawable', 'mipmap', 'values', 'xml']
 ------------------------------------------------------------------------
 RESULT: PASS - all resources well-formed, all vector path data valid,
@@ -16,7 +16,7 @@ Axiom Calc - Kotlin import validation
 ========================================================================
 Kotlin files scanned ...... 77
 Imported names indexed .... 339
-Top-level declarations .... 1672
+Top-level declarations .... 1680
 Member names suppressed ... 158
 ------------------------------------------------------------------------
 No missing or ambiguous imports detected.

@@ -132,13 +132,14 @@ fun StandardCalculatorScreen(
 fun CalculatorDisplay(state: CalculatorUiState, viewModel: CalculatorViewModel) {
     Column {
         if (state.memory != null) {
+            val memoryLabel = stringResource(R.string.memory_indicator, state.memory.orEmpty())
             Text(
                 text = stringResource(R.string.memory_value_format, state.memory),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .padding(bottom = 4.dp)
-                    .semantics { stateDescription = "Memory holds ${state.memory}" },
+                    .semantics { stateDescription = memoryLabel },
             )
         }
         com.shohankhan.axiomcalc.core.ui.DisplayPanel(

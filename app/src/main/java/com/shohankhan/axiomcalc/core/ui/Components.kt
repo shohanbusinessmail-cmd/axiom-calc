@@ -34,10 +34,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import com.shohankhan.axiomcalc.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -162,6 +164,26 @@ fun DisplayPanel(
 ) {
     val extended = Axiom.extended
     val align = if (alignEnd) TextAlign.End else TextAlign.Start
+
+    // TalkBack labels for all three display lines. Every one of these has to be
+    // resolved here, in composition: the `semantics {}` lambda is NOT a
+    // composable scope, so calling stringResource inside it does not compile.
+    // An unlabelled expression line reads as bare glyphs ("2+3×4") and an
+    // unlabelled error line reads as a sentence with no indication that it is an
+    // error, so both are labelled explicitly.
+    val errorMessage = error?.userMessage()
+    val emptyExpression = stringResource(R.string.display_empty)
+    val expressionLabel = stringResource(
+        R.string.a11y_expression_display,
+        expression.ifBlank { emptyExpression },
+    )
+    val resultLabel = stringResource(R.string.a11y_result_display, result)
+    val errorLabel = if (errorMessage != null) {
+        stringResource(R.string.a11y_error_state, errorMessage)
+    } else {
+        null
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(AxiomDimens.Radius),
@@ -175,7 +197,9 @@ fun DisplayPanel(
                 textAlign = align,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = expressionLabel },
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -189,7 +213,7 @@ fun DisplayPanel(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { contentDescription = "Result $result" }
+                    .semantics { contentDescription = resultLabel }
                     .then(
                         // Long-press copies the calculation; implemented with
                         // pointerInput so no experimental Foundation API is needed.
@@ -202,7 +226,7 @@ fun DisplayPanel(
             )
             Spacer(Modifier.height(4.dp))
             val status = when {
-                error != null -> error.userMessage()
+                errorMessage != null -> errorMessage
                 preview != null -> "= $preview"
                 else -> null
             }
@@ -213,7 +237,17 @@ fun DisplayPanel(
                 textAlign = align,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        // Only an error is announced as one; the live preview
+                        // line keeps its own text as the label.
+                        if (errorLabel != null) {
+                            Modifier.semantics { contentDescription = errorLabel }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
     }

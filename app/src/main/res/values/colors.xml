@@ -6,9 +6,7 @@
   first frame, before Compose has composed anything.
 -->
 <resources>
-    <color name="brand_accent">#FF38BDF8</color>
     <color name="surface_dark">#FF0B0E13</color>
     <color name="surface_light">#FFF7F8FA</color>
     <color name="ic_launcher_background">#FF0B0E13</color>
-    <color name="ic_launcher_foreground">#FF38BDF8</color>
 </resources>
