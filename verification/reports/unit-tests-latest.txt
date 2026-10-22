@@ -1,0 +1,257 @@
+>> static check: resources
+========================================================================
+Axiom Calc - resource validation
+========================================================================
+XML files parsed .......... 36
+Vector drawables .......... 22
+Vector paths validated .... 36
+Resource kinds indexed .... ['drawable', 'mipmap', 'values', 'xml']
+------------------------------------------------------------------------
+RESULT: PASS - all resources well-formed, all vector path data valid,
+        all intra-project resource references resolve.
+
+>> static check: imports
+========================================================================
+Axiom Calc - Kotlin import validation
+========================================================================
+Kotlin files scanned ...... 78
+Imported names indexed .... 341
+Top-level declarations .... 1693
+Member names suppressed ... 158
+------------------------------------------------------------------------
+No missing or ambiguous imports detected.
+------------------------------------------------------------------------
+RESULT: PASS
+
+>> static check: CI workflow
+========================================================================
+Axiom Calc - GitHub Actions workflow validation
+========================================================================
+Workflows checked ......... 1
+run scripts bash -n'd ..... 20
+python heredocs compiled .. 6
+------------------------------------------------------------------------
+No problems found.
+------------------------------------------------------------------------
+RESULT: PASS
+
+>> static check: Kotlin syntax (all sources)
+========================================================================
+Axiom Calc - Kotlin syntax validation
+========================================================================
+Kotlin sources parsed ..... 80
+Total kotlinc diagnostics . 4103 (unresolved Android types expected)
+Syntax errors ............. 0
+------------------------------------------------------------------------
+RESULT: PASS - every Kotlin source parses. Semantic correctness against
+        the Android SDK is verified by CI, not here.
+
+>> compiling 39 Kotlin sources (core=31 tests=6 shim=2)
+>> running tests
+====================================================================================================
+AXIOM CALC - STANDALONE VERIFICATION RUN (JUnit4-compatible shim harness)
+classes dir : /home/user/axiom-calc/verification/.out/classes
+test classes: 7    executed: 192
+====================================================================================================
+com.shohankhan.axiomcalc.domain.CalculatorBehaviorTest
+    PASS   additivePercentSubtraction
+    PASS   additivePercentUsesLeftOperand
+    PASS   allClearEmptiesButKeepsMemory
+    PASS   backspaceRemovesWholeFunctionToken
+    PASS   chainedAdditivePercents
+    PASS   clearEntryKeepsTheRestOfTheExpression
+    PASS   closeParenIsIgnoredWhenUnbalanced
+    PASS   defaultRetentionIsThirtyDays
+    PASS   divisionPercent
+    PASS   emptyBufferIsIncompleteNotError
+    PASS   memoryAddAndSubtract
+    PASS   memoryRecallInsertsLiteral
+    PASS   missingParenthesesAreSuppliedAtEvaluationOnly
+    PASS   multiplicativePercent
+    PASS   operatorReplacementPreventsDoubleOperation
+    PASS   retentionCutoffs
+    PASS   retentionExpiryUsesInjectableClock
+    PASS   signToggleActsOnCurrentEntry
+    PASS   signToggleAtStartCreatesUnaryMinus
+    PASS   simpleArithmetic
+    PASS   standalonePercentIsDivideByHundred
+    PASS   undoAndRedoRestoreExactlyOneKeyPress
+com.shohankhan.axiomcalc.domain.CatalogCompletenessTest
+    PASS   catalogSearchFindsForms
+    PASS   everyCategoryHasForms
+    PASS   everyFormComputesWithValidInput
+    PASS   everyFormDeclaresItsInputsAndFormula
+    PASS   everyFormHasASample
+    PASS   everyFormRejectsGarbageExplicitly
+    PASS   everyToolHasASample
+    PASS   everyToolSolvesWithShownWorking
+    PASS   knownReferenceResultsFromForms
+    PASS   libraryCoversEveryCategory
+    PASS   libraryEntriesAreComplete
+    PASS   libraryLinksResolveToImplementedForms
+    PASS   librarySearchFindsByKeywordAndCategory
+    PASS   quadraticToolMatchesSolver
+    PASS   triangleInequalityIsEnforced
+    PASS   zeroDenominatorsAreRejectedNotSilent
+com.shohankhan.axiomcalc.domain.PersistenceSemanticsTest
+    PASS   allRegistryConstantsAreUsableByIdentifier
+    PASS   canonicalFormRoundTripsExactly
+    PASS   canonicalFormSurvivesVeryLargeAndVerySmallValues
+    PASS   canonicalParsingRejectsDisplayText
+    PASS   cutoffsAreExactlyOneSevenThirtyNinetyDays
+    PASS   defaultRetentionIsThirtyDays
+    PASS   expiryIsInclusiveAtTheBoundary
+    PASS   keypadInsertedSymbolsEvaluateInExpressions
+    PASS   neverRetainHasNoCutoff
+    PASS   retentionLabelsAreHumanReadable
+    PASS   retentionParsesFromNameAndDaysSafely
+    PASS   retentionUsesTheInjectedClockNotTheSystemClock
+    PASS   reusedStoredValueFeedsTheEngineExactly
+    PASS   toRowsPreservesShapeAndOrder
+    PASS   traceRequiresASquareMatrix
+    PASS   typographicSymbolsResolveToConstants
+com.shohankhan.axiomcalc.math.ExpressionEngineTest
+    PASS   asinOutOfRangeIsDomain
+    PASS   cos60deg
+    PASS   decimalExactness
+    PASS   deepParenthesesAreGroupingNotNodes
+    PASS   degreesModeIsDefault
+    PASS   discountTwentyOnFiveHundred
+    PASS   divisionByZeroIsTyped
+    PASS   divisionSignAccepted
+    PASS   engineeringExponentMultipleOfThree
+    PASS   engineeringNotation
+    PASS   excessiveNestingIsResourceLimit
+    PASS   factorialAboveLimitIsResourceLimit
+    PASS   factorialOfNonIntegerIsDomain
+    PASS   factorialPostfix
+    PASS   fixedDecimals
+    PASS   gcd48and18
+    PASS   groupingApplied
+    PASS   groupingCanBeDisabled
+    PASS   implicitMultiplicationWithConstant
+    PASS   implicitMultiplicationWithParens
+    PASS   incompleteExpression
+    PASS   increaseFrom80to100
+    PASS   integerResultsStayExact
+    PASS   inverseTrigRespectsMode
+    PASS   juxtapositionBindsTighterThanDivision
+    PASS   lcm12and18
+    PASS   lnOfE
+    PASS   lnOfZeroIsDomain
+    PASS   log10of1000
+    PASS   logBaseOneIsDomain
+    PASS   longExpressionIsBounded
+    PASS   malformedLiteral
+    PASS   meanOf246
+    PASS   modOperator
+    PASS   negativeBaseFractionalExponentIsDomain
+    PASS   negativeExponent
+    PASS   negativeFactorialIsDomain
+    PASS   nestedFunctionArguments
+    PASS   nestedParentheses
+    PASS   overflowIsTyped
+    PASS   parenthesesFirst
+    PASS   parenthesisedNegativeBase
+    PASS   percentOfContext
+    PASS   powerIsRightAssociative
+    PASS   precedenceMulBeforeAdd
+    PASS   previewIsNullWhileIncomplete
+    PASS   previewReturnsValueWhenComplete
+    PASS   previewSurfacesRealErrors
+    PASS   previousAnswerSubstitution
+    PASS   quadraticRoots
+    PASS   radiansModeChangesTrig
+    PASS   roundingHalfEven
+    PASS   roundingHalfUp
+    PASS   scientificNotation
+    PASS   scientificNotationLiteral
+    PASS   scientificNotationNegativeExponent
+    PASS   significantFigures
+    PASS   sin30deg
+    PASS   sqrt81
+    PASS   sqrtOfNegativeIsDomain
+    PASS   syntaxErrorOnStrayOperator
+    PASS   tanSingularityIsDomain
+    PASS   tinyValueSwitchesToScientific
+    PASS   twoEIsMultiplicationWithEuler
+    PASS   twoPlusTwo
+    PASS   unaryMinusBindsLooserThanPower
+    PASS   unbalancedParentheses
+    PASS   unicodeOperatorsAreAccepted
+    PASS   unknownFunctionIsTyped
+    PASS   wrongArityIsInvalidArgument
+    PASS   zeroDividedByZeroIsTyped
+    PASS   zeroToNegativePowerIsDivisionByZero
+    PASS   zeroToZeroIsOne
+com.shohankhan.axiomcalc.math.PrecisionSqrtTest
+    PASS   engineReportsDomainForSqrtOfNegative
+    PASS   engineSqrtUsesThePlatformIndependentRoot
+    PASS   irrationalRootsMatchReferenceDigits
+    PASS   negativeArgumentIsATypedDomainError
+    PASS   resultSquaredReproducesTheArgument
+    PASS   rootIsMonotonicAndNeverNegative
+    PASS   standardDeviationUsesThePlatformIndependentRoot
+    PASS   veryLargeAndVerySmallMagnitudesStillConverge
+    PASS   zeroAndPerfectSquaresAreExact
+com.shohankhan.axiomcalc.math.SolversTest
+    PASS   amortizationReference
+    PASS   amortizationZeroRateDegeneratesToDivision
+    PASS   arithmeticSequence
+    PASS   baseArithmetic
+    PASS   baseConversions
+    PASS   bisectionConvergesAndValidatesResidual
+    PASS   bisectionInvalidBracketIsReported
+    PASS   coefficientExtractionAndLinearityCheck
+    PASS   complexArithmetic
+    PASS   complexDivisionByZeroIsTyped
+    PASS   compoundInterestReference
+    PASS   dateAdditionAcrossLeapDay
+    PASS   dayCountConventions
+    PASS   determinantAndInverse
+    PASS   dimensionMismatchIsTyped
+    PASS   durationMayExceed24h
+    PASS   durationSubtractionCanGoNegative
+    PASS   emptyDatasetIsTyped
+    PASS   factorizationBoundIsEnforced
+    PASS   fractionArithmeticExact
+    PASS   fractionMixedAndDecimal
+    PASS   fractionParseMixed
+    PASS   fractionZeroDenominatorIsTyped
+    PASS   gcdLcmFactorial
+    PASS   geometricSequenceAndRatioOne
+    PASS   infiniteGeometricDivergenceIsReported
+    PASS   insufficientSampleIsTyped
+    PASS   invalidDateIsTyped
+    PASS   invalidDigitForBaseIsTyped
+    PASS   leapYearHandling
+    PASS   linearNoSolutionAndInfinite
+    PASS   linearUnique
+    PASS   markupVersusMargin
+    PASS   matrixParseRejectsRaggedRows
+    PASS   matrixProductAndTranspose
+    PASS   modeHandlesTiesAndDistinct
+    PASS   monthAdditionClampsDay
+    PASS   negativeFactorialIsDomain
+    PASS   newtonConverges
+    PASS   newtonZeroDerivativeIsReported
+    PASS   oversizedMatrixIsResourceLimit
+    PASS   polarRoundTrip
+    PASS   primalityAndFactorization
+    PASS   quadraticComplexRootsAreConjugates
+    PASS   quadraticKinds
+    PASS   quadraticStableRootsForIllConditionedCase
+    PASS   rankDetection
+    PASS   simpleInterestReference
+    PASS   simultaneousInfinite
+    PASS   simultaneousNoSolution
+    PASS   simultaneousUnique
+    PASS   singularMatrixInverseIsTyped
+    PASS   statisticsReferenceValues
+    PASS   successiveDiscountsDoNotAdd
+    PASS   weightedMean
+    PASS   zeroDenominatorGuards
+----------------------------------------------------------------------------------------------------
+TOTAL 192   PASSED 192   FAILED 0   ERRORS 0   SKIPPED 0
+----------------------------------------------------------------------------------------------------
+RESULT: PASS

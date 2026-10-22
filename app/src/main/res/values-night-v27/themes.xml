@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API 27-28, dark. Light navigation bar icons would be invisible here. -->
+    <style name="Theme.AxiomCalc" parent="Base.Theme.AxiomCalc">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

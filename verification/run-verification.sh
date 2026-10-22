@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# ===========================================================================
+#  Axiom Calc - standalone verification run
+# ===========================================================================
+#  Compiles the pure-Kotlin core (math/, core/, domain/) together with the REAL
+#  unit tests that live in app/src/test, plus the documented JUnit4-compatible
+#  shim harness, and executes them on the JVM.
+#
+#  This is NOT a substitute for `./gradlew test`: it is the way to obtain
+#  executed test evidence in environments where the Android SDK and Maven
+#  Central are unreachable. On a normal machine run `./gradlew test` instead;
+#  the same test classes execute there under real JUnit 4.
+#
+#  Usage:
+#    verification/run-verification.sh                # run everything
+#    verification/run-verification.sh Parser         # run classes matching "Parser"
+# ===========================================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TOOLS="${AXIOM_TOOLCHAIN_DIR:-$HOME/.cache/axiomtool}"
+FILTER="${1:-}"
+
+# ---------------------------------------------------------------------------
+#  Static gates. These need no toolchain, so they run first and fail fast.
+#  Both exist because a real Android build exposed defects that no local
+#  syntax-only sweep could see:
+#    validate_resources.py - a vector tint referencing a theme attribute the
+#                            applied theme does not define, which aborts aapt2
+#                            resource linking for the whole app;
+#    validate_imports.py   - 96 Kotlin compile errors, almost all missing or
+#                            wrong-package imports, which abort compilation
+#                            before a single test can run;
+#    validate_syntax.sh    - a stray closing brace left in an instrumented test
+#                            by an edit, which no other local check can see.
+# ---------------------------------------------------------------------------
+echo ">> static check: resources"
+python3 "$ROOT/tools/validate_resources.py"
+echo
+echo ">> static check: imports"
+python3 "$ROOT/tools/validate_imports.py"
+echo
+# Optional: the CI workflow itself cannot be dry-run locally, so it is checked
+# statically (YAML parse, bash -n on every run script, compile every embedded
+# python heredoc, pipefail on every piped step). Skipped, not failed, when
+# PyYAML is unavailable.
+echo ">> static check: CI workflow"
+if python3 -c "import yaml" 2>/dev/null; then
+  python3 "$ROOT/tools/validate_workflow.py"
+else
+  echo "SKIP - PyYAML is not installed; install it to validate .github/workflows"
+fi
+echo
+
+if [[ ! -x "$TOOLS/jdk17/bin/java" || ! -x "$TOOLS/kotlinc/bin/kotlinc" ]]; then
+  bash "$ROOT/tools/bootstrap-verification-toolchain.sh"
+fi
+
+export JAVA_HOME="$TOOLS/jdk17"
+export PATH="$JAVA_HOME/bin:$TOOLS/kotlinc/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+#  Syntax gate. Runs here rather than above because it needs the compiler.
+#  The harness below only compiles the JVM-testable subset, so a syntax error in
+#  an instrumented test or an Android-only screen would never be seen locally:
+#  it would surface in CI as a failed kspDebugAndroidTestKotlin task after five
+#  minutes of Gradle, and skip the emulator job with it. kotlinc cannot resolve
+#  androidx here, so only its parser diagnostics are treated as failures.
+# ---------------------------------------------------------------------------
+echo ">> static check: Kotlin syntax (all sources)"
+bash "$ROOT/tools/validate_syntax.sh"
+echo
+
+OUT="$ROOT/verification/.out/classes"
+rm -rf "$OUT"
+mkdir -p "$OUT"
+
+# Only the Android-free subset is compiled here. Three packages are excluded
+# because they depend on artifacts this harness cannot resolve offline:
+#   domain/repository  -> kotlinx.coroutines Flow contracts
+#   core/ui            -> Compose + Android resources (R, @StringRes)
+#   core/design        -> Compose Material 3 theme objects
+# Everything else (math/, core/errors, core/formatting, domain/model,
+# domain/calculator, domain/formula, domain/solver, domain/library) is compiled
+# and tested here, and the excluded packages are covered by the instrumented
+# suite documented in TESTING.md.
+mapfile -t CORE_SOURCES < <(
+  find "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/math" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/core/errors" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/core/formatting" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/model" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/calculator" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/formula" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/solver" \
+       "$ROOT/app/src/main/java/com/shohankhan/axiomcalc/domain/library" \
+       -name '*.kt' 2>/dev/null | sort
+)
+mapfile -t TEST_SOURCES < <(find "$ROOT/app/src/test" -name '*.kt' 2>/dev/null | sort)
+mapfile -t SHIM_SOURCES < <(find "$ROOT/verification/shim" -name '*.kt' | sort)
+
+TOTAL=$(( ${#CORE_SOURCES[@]} + ${#TEST_SOURCES[@]} + ${#SHIM_SOURCES[@]} ))
+echo ">> compiling $TOTAL Kotlin sources (core=${#CORE_SOURCES[@]} tests=${#TEST_SOURCES[@]} shim=${#SHIM_SOURCES[@]})"
+
+kotlinc -nowarn -jvm-target 17 \
+  "${CORE_SOURCES[@]}" "${TEST_SOURCES[@]}" "${SHIM_SOURCES[@]}" \
+  -d "$OUT" 2> >(grep -v "^warning:" >&2 || true)
+
+echo ">> running tests"
+exec java -cp "$OUT:$TOOLS/kotlinc/lib/kotlin-stdlib.jar" JUnitRunnerKt "$OUT" "$FILTER"

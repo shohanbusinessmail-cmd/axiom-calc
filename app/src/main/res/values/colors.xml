@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Colour tokens are mirrored 1:1 by the Compose design system in
+  core/design/AxiomColors.kt. The XML values here exist only so that the
+  pre-Compose window background and the system bars are correct during the
+  first frame, before Compose has composed anything.
+-->
+<resources>
+    <color name="surface_dark">#FF0B0E13</color>
+    <color name="surface_light">#FFF7F8FA</color>
+    <color name="ic_launcher_background">#FF0B0E13</color>
+</resources>

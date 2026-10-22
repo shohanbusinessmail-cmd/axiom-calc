@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 29+, light. Both enforce*Contrast attributes exist from API 29 and
+      default to TRUE, which would paint an opaque scrim over the transparent
+      system bars this theme asks for. They are turned off explicitly so the
+      bars show the app surface, and windowLightNavigationBar from API 27 is
+      repeated because this file replaces values-v27 on API 29+.
+    -->
+    <style name="Theme.AxiomCalc" parent="Base.Theme.AxiomCalc">
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+</resources>

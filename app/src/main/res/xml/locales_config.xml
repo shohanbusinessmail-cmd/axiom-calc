@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Per-app language declaration. Axiom Calc ships English only, as specified.
+  Declaring the locale explicitly keeps the system language picker honest
+  instead of implying translations that do not exist.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+</locale-config>

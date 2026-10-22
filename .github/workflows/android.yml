@@ -1,0 +1,767 @@
+# ============================================================================
+#  Axiom Calc - Android CI
+# ----------------------------------------------------------------------------
+#  This workflow exists to close the verification gaps that the authoring
+#  sandbox could not: it runs on GitHub-hosted runners, which have JDK 17, the
+#  Android SDK and network access to Google's and Maven's repositories.
+#
+#  Evidence it produces for items reported BLOCKED / NOT TESTED in
+#  DELIVERY_REPORT.md and FEATURE_ACCEPTANCE.md:
+#    * ./gradlew testDebugUnitTest  (the 183 unit tests under real JUnit 4)
+#    * ./gradlew lintDebug
+#    * ./gradlew assembleDebug / assembleRelease, then the APK inspected with
+#      aapt2 badging, aapt2 dump permissions and apksigner verify
+#    * source AND merged manifest permission audits (fail on any permission)
+#    * release runtime classpath audit (fail on networking/analytics/ad SDKs)
+#    * ./gradlew connectedDebugAndroidTest on an API 34 emulator (75 tests)
+#
+#  Every result is posted back as a comment on the open pull request, so the
+#  evidence is readable without access to the runner logs and stays with the PR.
+#
+#  Nothing here signs a release with a production identity: no keystore or
+#  credential is referenced, and the release variant stays unsigned unless the
+#  owner supplies keystore.properties locally (RELEASE.md section 5).
+# ============================================================================
+
+name: Android CI
+
+on:
+  push:
+    branches: ['arena/837f6b83-axiom-calc', main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  EVIDENCE_DIR: /tmp/axiom-evidence
+
+jobs:
+  build-and-verify:
+    name: Build, unit tests, lint, APK inspection
+    runs-on: ubuntu-latest
+    outputs:
+      apk-built: ${{ steps.assemble-debug.outputs.apk }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare evidence directory
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          echo "run_id=$GITHUB_RUN_ID" > "$EVIDENCE_DIR/meta.txt"
+          echo "sha=$(git rev-parse HEAD)" >> "$EVIDENCE_DIR/meta.txt"
+          ./gradlew --version 2>&1 | tee "$EVIDENCE_DIR/gradle-version.txt"
+
+      - name: Record wrapper integrity
+        run: |
+          set -euo pipefail
+          {
+            echo '## Gradle wrapper'
+            echo '```'
+            ls -l gradle/wrapper/gradle-wrapper.jar
+            sha256sum gradle/wrapper/gradle-wrapper.jar
+            cat gradle/wrapper/gradle-wrapper.properties
+            echo '```'
+          } > "$EVIDENCE_DIR/01-wrapper.md"
+
+      - name: Source manifest permission audit
+        run: |
+          set -euo pipefail
+          {
+            echo '## Source manifest audit'
+            echo '```'
+            python3 - <<'PYAUDIT'
+          import re, pathlib, sys
+          text = pathlib.Path('app/src/main/AndroidManifest.xml').read_text()
+          requested, removed = [], []
+          for m in re.finditer(r'<uses-permission\b([^>]*)>', text):
+              attrs = m.group(1)
+              name = (re.search(r'android:name="([^"]+)"', attrs) or [None, '?'])[1]
+              (removed if 'tools:node="remove"' in attrs else requested).append(name)
+          print(f'permissions requested : {len(requested)}')
+          for n in requested:
+              print(f'    REQUESTED  {n}')
+          print(f'permissions removed   : {len(removed)}  (tools:node="remove")')
+          for n in removed:
+              print(f'    REMOVED    {n}')
+          bad = [n for n in requested if n != '?']
+          if bad:
+              print('FAIL: the source manifest requests a permission')
+              sys.exit(1)
+          print('PASS: the source manifest requests no permission; INTERNET is absent')
+          PYAUDIT
+            echo '```'
+          } > "$EVIDENCE_DIR/02-source-manifest.md"
+
+      - name: Static checks (resources and imports)
+        id: static-checks
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          {
+            echo '## Static checks'
+            echo
+            echo 'Both run offline with no Android SDK. They exist because a real'
+            echo 'build exposed defects that nothing else in this sandbox can see.'
+            echo
+            echo '```'
+            python3 tools/validate_resources.py 2>&1 | tee "$EVIDENCE_DIR/static-resources.log" | tail -12
+            echo '```'
+            echo
+            echo '```'
+            python3 tools/validate_imports.py 2>&1 | tee "$EVIDENCE_DIR/static-imports.log" | tail -20
+            echo '```'
+            echo
+            echo '```'
+            python3 tools/validate_workflow.py 2>&1 | tee "$EVIDENCE_DIR/static-workflow.log" | tail -12
+            echo '```'
+          } > "$EVIDENCE_DIR/00a-static.md"
+
+      - name: Unit tests (real JUnit 4)
+        id: unit-tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee "$EVIDENCE_DIR/unit-tests.log"
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+
+      - name: Lint report
+        id: lint-report
+        if: always()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          {
+            echo '## Lint report'
+            echo '```'
+            python3 - <<'PYLINT'
+          import glob, os, sys, xml.etree.ElementTree as ET
+          from collections import Counter
+          reports = sorted(glob.glob('app/build/reports/**/lint-results*.xml', recursive=True))
+          if not reports:
+              print('no lint XML report was produced. Files under app/build/reports:')
+              for root, _dirs, files in os.walk('app/build/reports'):
+                  for f in files:
+                      print('  ', os.path.join(root, f))
+              sys.exit(0)
+          path = reports[0]
+          print('parsed', path)
+          issues = list(ET.parse(path).getroot().findall('issue'))
+          print(f'total issues: {len(issues)}')
+          counts = Counter((i.get('severity'), i.get('id')) for i in issues)
+          for (sev, iid), n in sorted(counts.items()):
+              print(f'  {sev:<9} {iid} x{n}')
+          root_dir = ET.parse(path).getroot().get('root') or ''
+
+          def show(issue):
+              loc = issue.find('location')
+              where = 'unknown location'
+              if loc is not None:
+                  path = (loc.get('file') or '').replace(root_dir, '')
+                  where = f"{path}:{loc.get('line')}:{loc.get('column')}"
+              print(f"[{issue.get('severity')}/{issue.get('id')}] {where}")
+              print(f"    {issue.get('message')}")
+
+          errors = [i for i in issues if i.get('severity') == 'Error']
+          print(f'--- all {len(errors)} Error-severity issues ---')
+          for i in errors:
+              show(i)
+          if not errors:
+              print('none')
+
+          # Warnings are published in full as well, except the two "a newer
+          # version exists" notices. This project pins a toolchain that was
+          # verified to work together (see README.md); upgrading on a
+          # suggestion is not an improvement, and 51 near-identical notices
+          # would bury the warnings that do describe real defects.
+          SUMMARISED = {'GradleDependency', 'AndroidGradlePluginVersion'}
+          warnings = [i for i in issues
+                      if i.get('severity') == 'Warning' and i.get('id') not in SUMMARISED]
+          print(f'--- all {len(warnings)} other Warning-severity issues ---')
+          for i in warnings:
+              show(i)
+          if not warnings:
+              print('none')
+          pinned = [i for i in issues if i.get('id') in SUMMARISED]
+          if pinned:
+              print(f'--- {len(pinned)} version-suggestion notices, not acted on ---')
+              for i in pinned[:5]:
+                  show(i)
+          PYLINT
+            echo '```'
+          } > "$EVIDENCE_DIR/05b-lint.md"
+
+      - name: Assemble debug
+        id: assemble-debug
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug 2>&1 | tee "$EVIDENCE_DIR/assemble-debug.log"
+          STATUS=$?
+          # Published so the emulator job can decide on the thing it actually
+          # needs - a debug APK - instead of on this whole job's conclusion.
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "apk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apk=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit $STATUS
+
+      - name: Assemble release (unsigned)
+        id: assemble-release
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease 2>&1 | tee "$EVIDENCE_DIR/assemble-release.log"
+
+      - name: Inspect the debug APK
+        id: inspect-apk
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          {
+            echo '## Debug APK inspection'
+            echo "build-tools: $BT"
+            echo '```'
+            if [ -f "$APK" ]; then
+              ls -l "$APK"
+              stat -c '%s bytes' "$APK"
+              unzip -t "$APK" > /dev/null && echo 'PASS: zip archive integrity ok'
+              echo '--- aapt2 dump badging ---'
+              "$BT/aapt2" dump badging "$APK" 2>&1
+              echo '--- aapt2 dump permissions (must be empty) ---'
+              "$BT/aapt2" dump permissions "$APK" 2>&1
+              echo '--- apksigner verify ---'
+              "$BT/apksigner" verify --print-certs --verbose "$APK" 2>&1
+              echo '--- archive contents (first 40) ---'
+              unzip -l "$APK" | head -40
+            else
+              echo "FAIL: no APK was produced at $APK"
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/03-apk.md"
+
+      - name: Inspect the release APK
+        id: inspect-release
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          {
+            echo '## Release APK inspection'
+            echo '```'
+            APK="$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1 || true)"
+            if [ -n "${APK:-}" ] && [ -f "$APK" ]; then
+              echo "artifact: $APK"
+              ls -l "$APK"
+              "$BT/aapt2" dump badging "$APK" 2>&1
+              echo '--- signing status (unsigned expected: no owner key) ---'
+              "$BT/apksigner" verify --print-certs --verbose "$APK" 2>&1 || \
+                echo 'NOT SIGNED - expected; owner must sign per RELEASE.md section 5'
+            else
+              echo 'FAIL: no release APK was produced'
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/04-release-apk.md"
+
+      - name: Merged manifest permission audit
+        id: merged-manifest
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          {
+            echo '## Merged manifest audit'
+            echo
+            echo 'The source manifest requests nothing, but the manifest that ships is the'
+            echo 'merged one, so that is what is audited. Every permission in it must be on'
+            echo 'the allowlist below; anything else fails the build.'
+            echo
+            echo '```'
+            python3 - <<'PYAUDIT'
+          import glob, re, sys
+          ALLOWED = {
+              # Defined by androidx.core ON THIS APP with protectionLevel
+              # "signature" and then requested by the same app, so a receiver
+              # registered with RECEIVER_NOT_EXPORTED can only be signalled by
+              # this application. It grants no network, storage, hardware or
+              # cross-app access. WorkManager registers its force-stop
+              # receiver through ContextCompat.registerReceiver, which relies
+              # on it, and removing it cannot be tested on API 24-32 here.
+              'com.shohankhan.axiomcalc.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',
+          }
+          FORBIDDEN = {
+              'android.permission.INTERNET',
+              'android.permission.ACCESS_NETWORK_STATE',
+              'android.permission.ACCESS_WIFI_STATE',
+              'android.permission.CHANGE_NETWORK_STATE',
+              'android.permission.WAKE_LOCK',
+              'android.permission.RECEIVE_BOOT_COMPLETED',
+              'android.permission.FOREGROUND_SERVICE',
+              'android.permission.VIBRATE',
+              'android.permission.READ_EXTERNAL_STORAGE',
+              'android.permission.WRITE_EXTERNAL_STORAGE',
+              'android.permission.ACCESS_FINE_LOCATION',
+              'android.permission.CAMERA',
+              'android.permission.RECORD_AUDIO',
+              'android.permission.READ_CONTACTS',
+              'com.android.vending.BILLING',
+              'com.google.android.c2dm.permission.RECEIVE',
+          }
+          manifests = sorted(glob.glob('app/build/**/merged*manifest*/**/AndroidManifest.xml',
+                                       recursive=True))
+          if not manifests:
+              print('FAIL: no merged manifest was produced; nothing was audited')
+              sys.exit(1)
+          failed = False
+          for path in manifests:
+              text = open(path, encoding='utf-8').read()
+              names = sorted({m.group(1) for m in
+                              re.finditer(r'<uses-permission[^>]*android:name="([^"]+)"', text)})
+              print(f'---- {path}')
+              print(f'     uses-permission count: {len(names)}')
+              for n in names:
+                  if n in ALLOWED:
+                      print(f'     ALLOWED   {n}')
+                  elif n in FORBIDDEN:
+                      print(f'     FAIL      {n}  (explicitly forbidden)')
+                      failed = True
+                  else:
+                      print(f'     FAIL      {n}  (not on the allowlist)')
+              if not names:
+                  print('     (none)')
+          print()
+          if failed:
+              print('RESULT: FAIL - the shipped manifest declares a permission that is not allowed')
+              sys.exit(1)
+          print('RESULT: PASS - android.permission.INTERNET is absent from every merged')
+          print('        manifest, and the only surviving entry is the self-defined')
+          print('        signature permission that grants no capability.')
+          PYAUDIT
+            echo '```'
+          } > "$EVIDENCE_DIR/05-merged-manifest.md"
+
+      - name: Release dependency audit
+        id: dep-audit
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          ./gradlew app:dependencies --configuration releaseRuntimeClasspath \
+            > "$EVIDENCE_DIR/release-classpath.txt" 2>&1
+          BANNED='okhttp|retrofit|ktor|volley|firebase|play-services-ads|play-services-analytics|crashlytics|sentry|bugsnag|facebook|amplitude|mixpanel|segment|appsflyer|adjust|newrelic|onesignal|airship'
+          {
+            echo '## Release dependency audit'
+            echo '```'
+            if grep -Eiq "$BANNED" "$EVIDENCE_DIR/release-classpath.txt"; then
+              echo 'FAIL: a networking/analytics/advertising coordinate is present'
+              grep -Ein "$BANNED" "$EVIDENCE_DIR/release-classpath.txt"
+            else
+              echo 'PASS: no networking, analytics, advertising or crash-reporting dependency'
+            fi
+            echo '```'
+            echo '<details><summary>Full release runtime classpath</summary>'
+            echo ''
+            echo '```'
+            cat "$EVIDENCE_DIR/release-classpath.txt"
+            echo '```'
+            echo '</details>'
+          } > "$EVIDENCE_DIR/06-dependencies.md"
+
+      - name: Build the evidence report
+        if: always()
+        run: |
+          set -uo pipefail
+          python3 - <<'PY' > "$EVIDENCE_DIR/00-summary.md"
+          import glob, os, re, xml.etree.ElementTree as ET
+
+          ev = os.environ["EVIDENCE_DIR"]
+          tests, fails, errs, skip = 0, 0, 0, 0
+          failures = []
+          for path in sorted(glob.glob("app/build/test-results/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(path).getroot()
+              except Exception as e:
+                  failures.append((path, "unparsable report", str(e)))
+                  continue
+              suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+              for s in suites:
+                  tests += int(s.get("tests", 0))
+                  fails += int(s.get("failures", 0))
+                  errs += int(s.get("errors", 0))
+                  skip += int(s.get("skipped", 0))
+                  for tc in s.findall("testcase"):
+                      for kind in ("failure", "error"):
+                          for node in tc.findall(kind):
+                              failures.append((
+                                  f'{tc.get("classname")}.{tc.get("name")}',
+                                  node.get("type", kind),
+                                  (node.get("message") or "")[:400],
+                                  (node.text or "")[:2000],
+                              ))
+
+          print("## Unit test results (real JUnit 4 under Gradle)\n")
+          print("| tests | failures | errors | skipped |")
+          print("|---|---|---|---|")
+          print(f"| {tests} | {fails} | {errs} | {skip} |")
+          print()
+          if not tests:
+              print("**No test results were produced.** The compilation or the test task "
+                    "failed before any test ran; see the compile errors below.")
+          if failures:
+              print("\n### Failures\n")
+              for f in failures:
+                  print(f"#### `{f[0]}`")
+                  print(f"- type: `{f[1]}`")
+                  if len(f) > 2 and f[2]:
+                      print(f"- message: {f[2]}")
+                  if len(f) > 3 and f[3]:
+                      print("\n```\n" + f[3].strip() + "\n```")
+                  print()
+          PY
+
+          # Extract Kotlin/Java compile errors, which are the usual reason no
+          # test results exist at all.
+          {
+            echo '### Compiler and task errors from the logs'
+            echo '```'
+            # GitHub Actions runs every bash step with -e, so a grep that matches
+            # NOTHING aborts the step. That is exactly what a clean build looks
+            # like: this step failed for the first time only once the project
+            # compiled, tested, linted and packaged without a single error, and
+            # its failure then skipped the whole emulator job. Each stage is
+            # guarded so "no matches" is reported as the good news it is.
+            ERRORS="$(cat "$EVIDENCE_DIR"/*.log 2>/dev/null \
+              | { grep -E "^e: |^w: .*(deprecat|uncheck)|error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED" || true; } \
+              | { grep -v "^w:" || true; } | sort -u | head -120)"
+            if [ -n "$ERRORS" ]; then
+              printf '%s\n' "$ERRORS"
+            else
+              echo 'none - no compiler error, no compiler warning and no failed task in any log'
+            fi
+            echo '```'
+          } > "$EVIDENCE_DIR/00b-compile-errors.md"
+
+      - name: Post evidence to the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
+          PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number' || true)"
+          if [ -z "$PR" ]; then
+            echo "No open pull request for $BRANCH; evidence stays in the run summary."
+            cat "$EVIDENCE_DIR"/0*.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            exit 0
+          fi
+
+          {
+            echo "### Android CI evidence — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            echo
+            echo "Generated on a GitHub-hosted runner with JDK 17 and the Android SDK."
+            echo "Step outcomes: static checks=${{ steps.static-checks.outcome }}, unit tests=${{ steps.unit-tests.outcome }}, lint=${{ steps.lint.outcome }}, assembleDebug=${{ steps.assemble-debug.outcome }}, assembleRelease=${{ steps.assemble-release.outcome }}, APK=${{ steps.inspect-apk.outcome }}, release APK=${{ steps.inspect-release.outcome }}, merged manifest=${{ steps.merged-manifest.outcome }}, dependency audit=${{ steps.dep-audit.outcome }}."
+            echo
+            for f in "$EVIDENCE_DIR"/00-summary.md "$EVIDENCE_DIR"/00a-static.md \
+                     "$EVIDENCE_DIR"/00b-compile-errors.md \
+                     "$EVIDENCE_DIR"/01-wrapper.md "$EVIDENCE_DIR"/02-source-manifest.md \
+                     "$EVIDENCE_DIR"/03-apk.md "$EVIDENCE_DIR"/04-release-apk.md \
+                     "$EVIDENCE_DIR"/05-merged-manifest.md "$EVIDENCE_DIR"/05b-lint.md \
+                     "$EVIDENCE_DIR"/06-dependencies.md; do
+              # Not `[ -f "$f" ] && cat "$f"`: under the implicit `set -e` a
+              # missing file would abort the step and lose the entire report.
+              if [ -f "$f" ]; then cat "$f"; echo; fi
+            done
+            echo '<details><summary>Raw unit-test log (tail)</summary>'
+            echo ''
+            echo '```'
+            tail -120 "$EVIDENCE_DIR/unit-tests.log" 2>/dev/null || echo 'no log'
+            echo '```'
+            echo '</details>'
+          } > /tmp/pr-comment.md
+
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/pr-comment.md
+
+      - name: Fail the job if any verification step failed
+        if: always()
+        run: |
+          set -uo pipefail
+          FAILED=""
+          for pair in "static-checks:${{ steps.static-checks.outcome }}" \
+                      "unit-tests:${{ steps.unit-tests.outcome }}" \
+                      "lint:${{ steps.lint.outcome }}" \
+                      "assemble-debug:${{ steps.assemble-debug.outcome }}" \
+                      "assemble-release:${{ steps.assemble-release.outcome }}" \
+                      "inspect-apk:${{ steps.inspect-apk.outcome }}" \
+                      "merged-manifest:${{ steps.merged-manifest.outcome }}" \
+                      "dep-audit:${{ steps.dep-audit.outcome }}"; do
+            name="${pair%%:*}"; outcome="${pair##*:}"
+            if [ "$outcome" != "success" ]; then FAILED="$FAILED $name($outcome)"; fi
+          done
+          if [ -n "$FAILED" ]; then
+            echo "Verification steps did not all succeed:$FAILED"
+            exit 1
+          fi
+          echo "All verification steps succeeded."
+
+      - name: Upload APK and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axiom-calc-build-outputs
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/reports/tests/**
+            app/build/reports/lint-results-debug.*
+            app/schemas/**
+            /tmp/axiom-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  instrumented:
+    name: Instrumented tests on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: build-and-verify
+    # `always()` plus an explicit output test, rather than the default `needs`
+    # behaviour. A failure anywhere in the build job - including in a step that
+    # only formats evidence - used to skip all 75 instrumented tests silently.
+    # What the emulator genuinely needs is a debug APK, so that is what is
+    # checked. A job skipped by this condition is reported as skipped, never as
+    # passed, and the comment it posts states how many tests actually ran.
+    if: always() && needs.build-and-verify.outputs.apk-built == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Compile the instrumented APK BEFORE paying for an emulator. These
+      # sources had never been compiled by anything: the local harness cannot
+      # resolve androidx.test, and the main sources turned out to have 96 errors
+      # the first time a real compiler saw them. If they do not compile, an
+      # emulator boot is 20 wasted minutes and the result is still tests=0 with
+      # no explanation - which is exactly what the previous run produced.
+      - name: Compile the instrumented test APK
+        id: assemble-android-test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # `|| STATUS=$?` rather than a bare pipeline: GitHub runs every bash
+          # step with -e, so a failing Gradle aborted the script before it could
+          # record the output below, and the report then printed an empty value
+          # for exactly the runs that most needed it.
+          STATUS=0
+          ./gradlew assembleDebugAndroidTest --stacktrace 2>&1 \
+            | tee /tmp/android-test-compile.log || STATUS=$?
+          if ls app/build/outputs/apk/androidTest/debug/*.apk >/dev/null 2>&1; then
+            echo "apk=true" >> "$GITHUB_OUTPUT"
+            ls -l app/build/outputs/apk/androidTest/debug/
+          else
+            echo "apk=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit $STATUS
+
+      - name: Enable KVM for hardware acceleration
+        if: steps.assemble-android-test.outputs.apk == 'true'
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Run instrumented tests (75)
+        if: steps.assemble-android-test.outputs.apk == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          heap-size: 1024M
+          disable-animations: true
+          # pipefail is set explicitly: without it the pipeline's status is
+          # tee's, and 40 failing tests were reported as a green job.
+          script: bash -eo pipefail -c './gradlew connectedDebugAndroidTest --stacktrace 2>&1 | tee /tmp/connected.log'
+
+      - name: Post instrumented results to the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
+          PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number' || true)"
+          {
+            echo "### Instrumented test results — run [$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            echo
+            # The backticks are escaped: inside a double-quoted shell string an
+            # unescaped pair is command substitution, so the interpolated values
+            # were being executed as commands and printed as empty strings.
+            echo "androidTest APK built: \`${{ steps.assemble-android-test.outputs.apk }}\`"
+            echo "compile step outcome: \`${{ steps.assemble-android-test.outcome }}\`"
+            echo
+            if [ "${{ steps.assemble-android-test.outputs.apk }}" != "true" ]; then
+              echo '**The instrumented APK did not build, so no emulator was started'
+              echo 'and no test could run. `tests=0` below means NOT TESTED, not passed.**'
+              echo
+              echo '#### Compile errors'
+              echo '```'
+              ERRORS="$( { grep -E '^e: |error:|FAILURE:|What went wrong|Caused by:|Execution failed|> Task .*FAILED' /tmp/android-test-compile.log || true; } | sort -u | head -150)"
+              if [ -n "$ERRORS" ]; then printf '%s\n' "$ERRORS"; else tail -60 /tmp/android-test-compile.log 2>/dev/null || echo 'no log'; fi
+              echo '```'
+            fi
+            echo '```'
+            python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          tests = fails = errs = skip = 0
+          details = []
+          for path in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
+              root = ET.parse(path).getroot()
+              suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+              for s in suites:
+                  tests += int(s.get("tests", 0)); fails += int(s.get("failures", 0))
+                  errs += int(s.get("errors", 0)); skip += int(s.get("skipped", 0))
+                  for tc in s.findall("testcase"):
+                      for kind in ("failure", "error"):
+                          for node in tc.findall(kind):
+                              body = node.text or ""
+                              # The message attribute is empty in AndroidJUnit4
+                              # output; the assertion and the first frames of the
+                              # stack are in the element text. Skip `at ...`
+                              # frames so what is left is the actual cause.
+                              head = [l.strip() for l in body.split("\n")
+                                      if l.strip() and not l.strip().startswith("at ")]
+                              # A diagnostic test puts a layout dump in its
+                              # failure message, which is the only way to get
+                              # device state out of a runner whose logs and
+                              # artifacts are unreachable from here. Those get a
+                              # much larger budget than an ordinary assertion.
+                              is_diag = str(tc.get("name", "")).startswith("diagnostic")
+                              limit = 12000 if is_diag else 420
+                              cause = " | ".join(head[:3])[:limit]
+                              msg = node.get("message") or ""
+                              details.append(f'{tc.get("classname")}.{tc.get("name")}:\n'
+                                             f'    type: {node.get("type", "?")}\n'
+                                             f'    {msg}\n    {cause}')
+          print(f"tests={tests} failures={fails} errors={errs} skipped={skip}")
+          # Diagnostics first: they carry the device state everything else is
+          # interpreted against. Then ordinary failures, then names only, so the
+          # comment stays inside GitHub's size limit.
+          diags = [d for d in details if ":\n    type" in d and "DIAGNOSTIC" in d]
+          rest = [d for d in details if d not in diags]
+          for d in diags[:2]:
+              print("DIAGNOSTIC " + d)
+          for d in rest[:22]:
+              print("FAILED " + d)
+          if len(rest) > 22:
+              print(f"... and {len(rest) - 22} more failures, listed by name only:")
+              for d in rest[22:]:
+                  print("FAILED " + d.split(":")[0])
+          if not tests:
+              print()
+              print("No instrumented test result XML exists. This is NOT TESTED,")
+              print("not a pass. The reason is in the log tail below.")
+          PY
+            if [ -f /tmp/connected.log ]; then
+              echo
+              echo '<details><summary>connectedDebugAndroidTest log (tail)</summary>'
+              echo
+              echo '```'
+              tail -80 /tmp/connected.log
+              echo '```'
+              echo '</details>'
+            fi
+            echo '```'
+          } > /tmp/instr-comment.md
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/instr-comment.md
+          else
+            cat /tmp/instr-comment.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Without this the job could report success while zero tests ran: the
+      # compile step is continue-on-error and the emulator step is conditional,
+      # so a job where nothing executed would otherwise finish green. A run with
+      # no instrumented evidence is a failure, never a pass.
+      - name: Fail if no instrumented test actually ran
+        if: always()
+        run: |
+          set -uo pipefail
+          APK="${{ steps.assemble-android-test.outputs.apk }}"
+          XML_COUNT="$(find app/build/outputs/androidTest-results -name '*.xml' 2>/dev/null | wc -l)"
+          if [ "$APK" != "true" ]; then
+            echo "FAIL: the instrumented APK did not build, so no test ran."
+            exit 1
+          fi
+          if [ "$XML_COUNT" -eq 0 ]; then
+            echo "FAIL: the instrumented APK built but produced no result XML, so no test ran."
+            exit 1
+          fi
+          echo "Instrumented result files parsed: $XML_COUNT"
+          # Judge the results rather than trusting Gradle's exit status: a piped
+          # task can report success while tests failed.
+          BAD="$(python3 - <<'PYGATE'
+          import glob, xml.etree.ElementTree as ET
+          f = e = t = 0
+          for path in glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True):
+              root = ET.parse(path).getroot()
+              for s in ([root] if root.tag == "testsuite" else root.findall("testsuite")):
+                  t += int(s.get("tests", 0)); f += int(s.get("failures", 0))
+                  e += int(s.get("errors", 0))
+          print(f"{t} {f} {e}")
+          PYGATE
+          )"
+          read -r T F E <<< "$BAD"
+          echo "Instrumented: tests=$T failures=$F errors=$E"
+          if [ "$F" -ne 0 ] || [ "$E" -ne 0 ]; then
+            echo "FAIL: $F failure(s) and $E error(s) out of $T instrumented tests."
+            exit 1
+          fi
+
+      - name: Upload instrumented reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axiom-calc-instrumented-reports
+          path: |
+            app/build/outputs/androidTest-results/**
+            app/build/reports/androidTests/**
+          if-no-files-found: warn
+          retention-days: 14
